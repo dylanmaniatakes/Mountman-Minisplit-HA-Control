@@ -25,6 +25,7 @@ For the Seeed Studio XIAO IR Mate path:
 - `custom_components/mountman_minisplit/` is the HACS-installable Home Assistant custom integration.
 - `esphome/xiao-ir-mate-raw-api.yaml` is a manual ESPHome firmware example. HACS does not install or manage it.
 - `home-assistant/SETUP.md` explains how to interpret the factory firmware's Send button entity, such as `button.gym_gym_ir_send`, how to install the HACS integration, and what raw transmitter action the integration expects.
+- The generic ESPHome firmware exposes the dynamic sender as a Native API action, not as a normal device entity. Look for the action in Developer Tools > Actions, usually as `esphome.<node_name>_send_raw`.
 
 The factory firmware Send button is useful for replaying a learned slot. Full Mountman control is better served by the HACS integration plus a user-provided raw-send action because mini-split commands are full-state packets.
 
@@ -354,6 +355,8 @@ Do not treat that YAML as guaranteed exact service syntax. Use Developer Tools >
 ### Path B: ESPHome script fallback
 
 If the generic IR proxy action is awkward or not exposed clearly yet, define ESPHome scripts/buttons for known states and call them from Home Assistant. This is less elegant but reliable.
+
+The manual ESPHome example in this repo uses a hybrid of these ideas: the real HACS path calls a dynamic Native API action, while a visible `Send Mountman Off Test` button sends one fixed captured OFF packet for hardware smoke testing.
 
 Example for one fixed command:
 

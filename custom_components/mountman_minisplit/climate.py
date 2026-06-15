@@ -126,11 +126,12 @@ class MountmanMiniSplitClimate(ClimateEntity, RestoreEntity):
             model="Infrared mini-split bridge",
         )
 
-        self._transmitter_action = entry.data.get(CONF_TRANSMITTER_ACTION, DEFAULT_TRANSMITTER_ACTION)
-        self._packet_family = entry.data.get(CONF_PACKET_FAMILY, DEFAULT_PACKET_FAMILY)
-        self._default_fan = entry.data.get(CONF_DEFAULT_FAN, DEFAULT_FAN_MODE)
-        self._attr_min_temp = entry.data.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)
-        self._attr_max_temp = entry.data.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)
+        config = {**entry.data, **entry.options}
+        self._transmitter_action = config.get(CONF_TRANSMITTER_ACTION, DEFAULT_TRANSMITTER_ACTION)
+        self._packet_family = config.get(CONF_PACKET_FAMILY, DEFAULT_PACKET_FAMILY)
+        self._default_fan = config.get(CONF_DEFAULT_FAN, DEFAULT_FAN_MODE)
+        self._attr_min_temp = config.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)
+        self._attr_max_temp = config.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)
 
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_target_temperature = DEFAULT_TARGET_TEMP
@@ -285,6 +286,7 @@ class MountmanMiniSplitClimate(ClimateEntity, RestoreEntity):
 def _split_action(action: str) -> tuple[str, str]:
     """Split a Home Assistant action string like `esphome.gym_send_raw`."""
 
+    action = action.strip()
     if "." not in action:
         raise HomeAssistantError(f"Invalid Mountman transmitter action: {action}")
     domain, service = action.split(".", 1)

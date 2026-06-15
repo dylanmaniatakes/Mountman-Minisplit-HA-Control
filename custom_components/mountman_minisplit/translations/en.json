@@ -17,5 +17,23 @@
     "error": {
       "invalid_action": "Action must look like domain.service, for example esphome.gym_send_raw."
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Mountman Mini-Split IR options",
+        "description": "Update the raw IR transmitter action and protocol defaults without removing the climate entity.",
+        "data": {
+          "transmitter_action": "Raw IR transmitter action",
+          "packet_family": "Default cool packet family",
+          "default_fan": "Default fan mode",
+          "min_temp": "Minimum temperature",
+          "max_temp": "Maximum temperature"
+        }
+      }
+    },
+    "error": {
+      "invalid_action": "Action must look like domain.service, for example esphome.gym_send_raw."
+    }
   }
 }

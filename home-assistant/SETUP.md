@@ -24,6 +24,39 @@ esphome/xiao-ir-mate-raw-api.yaml
 
 That file is for manual flashing. HACS does not install it, copy it into Home Assistant, or manage ESPHome firmware.
 
+## Expected ESPHome Device Page
+
+The generic ESPHome firmware in this repo does not recreate the Seeed factory firmware's learned-command UI. After flashing `esphome/xiao-ir-mate-raw-api.yaml`, Home Assistant should show basic device entities such as:
+
+- `Status LED`
+- `Vibration Motor`
+- `Touch Button`
+- `Send Mountman Off Test`
+- `Restart`
+
+It is normal if there is no generic `IR Send` entity under the device. ESPHome's `remote_transmitter` and `remote_receiver` blocks define hardware hubs, not visible Home Assistant entities.
+
+The dynamic raw sender is an ESPHome Native API action. Use **Developer Tools > Actions** to find and test it. With the default repo firmware node name, the action is usually:
+
+```text
+esphome.gym_send_raw
+```
+
+If the firmware was edited before flashing, the action name follows the ESPHome node name. For example, this substitution:
+
+```yaml
+substitutions:
+  name: gymircontroller
+```
+
+usually creates:
+
+```text
+esphome.gymircontroller_send_raw
+```
+
+If Home Assistant still shows the old Seeed device name after flashing, reload the ESPHome integration entry or restart Home Assistant. If the old names remain confusing, delete the ESPHome device from Home Assistant and add it again with the flashed node's `.local` hostname or IP address.
+
 ## What `button.gym_gym_ir_send` Means
 
 The entity `button.gym_gym_ir_send` looks like the Seeed Studio factory firmware's **Send** button. That firmware stores learned IR commands in numbered slots, then sends the currently selected slot when the Send button is pressed.
@@ -91,6 +124,20 @@ If the ESPHome node is named `gym`, Home Assistant usually exposes that action a
 esphome.gym_send_raw
 ```
 
+To test the raw action plumbing directly before installing the HACS integration, use Developer Tools > Actions with a short raw pulse sequence:
+
+```yaml
+action: esphome.gym_send_raw
+data:
+  command:
+    - 3100
+    - 1500
+    - 560
+    - 2060
+```
+
+That shortened payload is only a syntax/connection test. It is not a complete mini-split command. The `Send Mountman Off Test` ESPHome button and the HACS integration both send complete 227-timing Mountman packets.
+
 ### Install Through HACS
 
 1. Open HACS.
@@ -124,6 +171,17 @@ Maximum temperature: 72
 ```
 
 The integration creates an assumed-state climate entity. Add it to a dashboard like any other thermostat/climate device.
+
+### Change the Raw Action After Setup
+
+If the ESPHome node name changes or the first action name was entered incorrectly:
+
+1. Go to Settings > Devices & services.
+2. Open the `Mountman Mini-Split IR` integration.
+3. Select Configure.
+4. Update `Raw IR transmitter action`.
+
+Home Assistant reloads the Mountman entity after the options are saved.
 
 ### First HACS Integration Tests
 

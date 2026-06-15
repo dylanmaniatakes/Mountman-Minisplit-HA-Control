@@ -23,6 +23,8 @@ Treat these findings as evidence for this captured remote/unit family, not as a 
 5. Test a known captured command before building dashboards or automations.
 6. Keep in mind that IR is one-way: Home Assistant will only know the state it last sent unless an IR receiver is also used.
 
+ESPHome note: the raw sender is a Native API action, not a normal device entity. It is expected to appear under Home Assistant **Developer Tools > Actions** as something like `esphome.gym_send_raw`. The example firmware also includes a visible `Send Mountman Off Test` button so the IR LEDs can be smoke-tested from the ESPHome device page.
+
 ### Flipper Zero
 
 1. Copy `flipper-tests/MOUNTMAN_FIRST_TESTS.ir` to the Flipper.
@@ -50,7 +52,7 @@ This repo includes a small toolchain so the protocol notes are reproducible and 
 - `tools/mountman_ir.py` decodes Flipper raw captures, builds Mountman packets, converts packets to raw timings, and writes Flipper `.ir` files.
 - `flipper-tests/MOUNTMAN_FIRST_TESTS.ir` contains the first real-world test bundle: captured heat 72°F, both predicted cool 72°F candidates, and captured power off.
 - `custom_components/mountman_minisplit/` is the HACS-installable Home Assistant custom integration.
-- `esphome/xiao-ir-mate-raw-api.yaml` is a manual ESPHome firmware example for exposing a raw IR send action.
+- `esphome/xiao-ir-mate-raw-api.yaml` is a manual ESPHome firmware example for exposing a raw IR send action and a fixed OFF test button.
 - `esphome/README.md` explains that firmware files are manual-use only and are not installed by HACS.
 - `home-assistant/SETUP.md` explains the Seeed factory firmware path, HACS install path, and raw transmitter action requirement.
 - `RELEASING.md` explains how to tag test releases so HACS can manage versions during protocol testing.
