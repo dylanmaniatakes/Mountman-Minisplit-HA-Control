@@ -25,4 +25,22 @@ MOUNTMAN_MODES = ["off", "cool", "heat", "dry", "fan_only"]
 MOUNTMAN_FANS = ["auto", "low", "medium", "high", "offish"]
 MOUNTMAN_FAMILIES = ["normal", "alternate"]
 
+ENTITY_DOMAINS_THAT_NEED_TARGETS = {
+    "binary_sensor",
+    "button",
+    "climate",
+    "fan",
+    "input_boolean",
+    "input_button",
+    "input_number",
+    "input_select",
+    "light",
+    "number",
+    "remote",
+    "select",
+    "sensor",
+    "switch",
+    "text",
+}
+
 SERVICE_SEND_STATE = "send_state"

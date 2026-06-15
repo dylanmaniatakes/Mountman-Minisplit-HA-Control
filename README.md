@@ -25,6 +25,8 @@ Treat these findings as evidence for this captured remote/unit family, not as a 
 
 ESPHome note: the raw sender is a Native API action, not a normal device entity. It is expected to appear under Home Assistant **Developer Tools > Actions** as something like `esphome.gym_send_raw`. The example firmware also includes a visible `Send Mountman Off Test` button so the IR LEDs can be smoke-tested from the ESPHome device page.
 
+Do not configure the Mountman integration with an ESPHome device id or a button entity such as `button.gym_gym_ir_send`. The integration must call a raw-send action that accepts a `command` timing array. The Seeed factory firmware's Send button can replay a learned slot, but it cannot accept the generated Mountman packet.
+
 ### Flipper Zero
 
 1. Copy `flipper-tests/MOUNTMAN_FIRST_TESTS.ir` to the Flipper.

@@ -20,6 +20,7 @@ from .const import (
     DEFAULT_PACKET_FAMILY,
     DEFAULT_TRANSMITTER_ACTION,
     DOMAIN,
+    ENTITY_DOMAINS_THAT_NEED_TARGETS,
     MOUNTMAN_FAMILIES,
     MOUNTMAN_FANS,
 )
@@ -41,14 +42,15 @@ class MountmanMiniSplitConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             user_input = _normalize_user_input(user_input)
-            if not _action_looks_valid(user_input[CONF_TRANSMITTER_ACTION]):
+            action_error = _transmitter_action_error(user_input[CONF_TRANSMITTER_ACTION])
+            if action_error:
                 return self.async_show_form(
                     step_id="user",
                     data_schema=_user_schema(user_input),
-                    errors={CONF_TRANSMITTER_ACTION: "invalid_action"},
+                    errors={CONF_TRANSMITTER_ACTION: action_error},
                 )
 
-            await self.async_set_unique_id(action)
+            await self.async_set_unique_id(user_input[CONF_TRANSMITTER_ACTION])
             self._abort_if_unique_id_configured()
             return self.async_create_entry(title=user_input[CONF_NAME], data=user_input)
 
@@ -75,11 +77,12 @@ class MountmanMiniSplitOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             user_input = _normalize_user_input(user_input)
-            if not _action_looks_valid(user_input[CONF_TRANSMITTER_ACTION]):
+            action_error = _transmitter_action_error(user_input[CONF_TRANSMITTER_ACTION])
+            if action_error:
                 return self.async_show_form(
                     step_id="init",
                     data_schema=_options_schema({**defaults, **user_input}),
-                    errors={CONF_TRANSMITTER_ACTION: "invalid_action"},
+                    errors={CONF_TRANSMITTER_ACTION: action_error},
                 )
 
             return self.async_create_entry(title="", data=user_input)
@@ -141,11 +144,17 @@ def _options_schema(defaults: dict) -> vol.Schema:
     )
 
 
-def _action_looks_valid(action: str) -> bool:
-    """Return whether a Home Assistant action name has `domain.service` shape."""
+def _transmitter_action_error(action: str) -> str | None:
+    """Return a config-flow error key when the transmitter action is unsafe."""
 
     domain, separator, service = action.strip().partition(".")
-    return bool(domain and separator and service)
+    if not (domain and separator and service):
+        return "invalid_action"
+
+    if domain in ENTITY_DOMAINS_THAT_NEED_TARGETS:
+        return "entity_id_not_action"
+
+    return None
 
 
 def _normalize_user_input(user_input: dict) -> dict:
