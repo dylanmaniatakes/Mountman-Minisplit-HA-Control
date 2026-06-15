@@ -15,9 +15,10 @@
 #
 #   action: esphome.gym_send_raw
 #   data:
-#     command: [3100, 1500, 560, 2060, ...]
+#     command: [3100, -1500, 560, -2060, ...]
 #
 # The `command` array is alternating mark/space durations in microseconds.
+# ESPHome expects marks as positive numbers and spaces as negative numbers.
 #
 # Home Assistant device-page note:
 #
@@ -54,7 +55,8 @@ api:
   actions:
     - action: send_raw
       variables:
-        # Alternating mark/space durations in microseconds.
+        # Alternating signed mark/space durations in microseconds. Positive
+        # values are IR carrier-on marks; negative values are carrier-off spaces.
         command: int[]
       then:
         - lambda: |-
@@ -87,7 +89,9 @@ captive_portal:
 remote_transmitter:
   id: ir_tx
   pin: GPIO3
-  carrier_duty_percent: 50%
+  # The captured Flipper files report about 33% duty cycle. Matching that value
+  # makes the ESPHome output closer to the original remote during testing.
+  carrier_duty_percent: 33%
 
 remote_receiver:
   id: ir_rx
@@ -116,13 +120,13 @@ button:
             std::vector<int> raw;
             raw.reserve(227);
             raw.push_back(3100);
-            raw.push_back(1500);
+            raw.push_back(-1500);
 
             for (uint8_t byte : packet) {
               for (uint8_t bit_index = 0; bit_index < 8; bit_index++) {
                 const bool bit_is_set = byte & (1 << bit_index);
                 raw.push_back(560);
-                raw.push_back(bit_is_set ? 2060 : 1040);
+                raw.push_back(bit_is_set ? -2060 : -1040);
               }
             }
 

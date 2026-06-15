@@ -79,7 +79,7 @@ web_server:
 remote_transmitter:
   id: ir_tx
   pin: GPIO4
-  carrier_duty_percent: 50%
+  carrier_duty_percent: 33%
 
 # Optional receiver for later learning/debugging.
 # Use a 38 kHz demodulating IR receiver module.
@@ -109,7 +109,7 @@ infrared:
 Notes:
 
 - For IR transmit only, the receiver block and second infrared entity can be removed.
-- ESPHome docs show `carrier_duty_percent: 50%`; the Flipper captures report around `0.330000`. In practice, 33-50% often works. Start with 50% because that is common in ESPHome examples. If the mini-split is unreliable, try 33%.
+- The Flipper captures report around `0.330000` duty cycle, so the repo firmware uses `carrier_duty_percent: 33%`. If range is poor after the packet format is confirmed, `50%` is a reasonable follow-up experiment because it drives the IR LED harder.
 - Keep the IR emitter physically aimed at the mini-split receiver window.
 
 ## Mountman packet generation model
@@ -142,6 +142,9 @@ TEMP_MAP_F = {
     70: (0x0A, 0x80),
     71: (0x0A, 0x84),
     72: (0x09, 0x80),
+    73: (0x09, 0x84), # inferred
+    74: (0x08, 0x80), # inferred
+    # Continue the same inferred pattern through 88F.
 }
 ```
 
@@ -188,6 +191,9 @@ TEMP_MAP_F = {
     70: (0x0A, 0x80),
     71: (0x0A, 0x84),
     72: (0x09, 0x80),
+    73: (0x09, 0x84), # inferred
+    74: (0x08, 0x80), # inferred
+    # Continue the same inferred pattern through 88F.
 }
 
 B8_FAN = {
@@ -204,6 +210,8 @@ def checksum(payload_13):
 
 
 def packet_to_raw_timings(packet):
+    """Return Flipper-style all-positive mark/space timings."""
+
     raw = [3100, 1500]
     for byte in packet:
         for bit_index in range(8):
@@ -212,6 +220,19 @@ def packet_to_raw_timings(packet):
             raw.append(2060 if bit else 1040)
     raw.append(560)
     return raw
+
+
+def packet_to_esphome_raw_timings(packet):
+    """Return ESPHome signed timings.
+
+    ESPHome uses positive numbers for carrier-on marks and negative numbers for
+    carrier-off spaces. A phone camera may still see the LEDs flash if the
+    spaces are accidentally positive, but a receiver such as a Flipper will not
+    decode a proper frame because the off gaps are missing.
+    """
+
+    flipper_raw = packet_to_raw_timings(packet)
+    return [value if index % 2 == 0 else -value for index, value in enumerate(flipper_raw)]
 
 
 def build_mountman_packet(mode="cool", temp_f=72, fan="high", family="normal"):
@@ -288,7 +309,7 @@ input_number:
   mountman_target_temp:
     name: Mountman Target Temp
     min: 61
-    max: 72 # raise after more captures
+    max: 88 # 73-88F is inferred and should be confirmed with captures
     step: 1
     unit_of_measurement: "°F"
 
@@ -332,7 +353,7 @@ Developer Tools > Actions
 
 Look for actions exposed by the ESPHome infrared entity or the infrared domain. The payload should be an alternating array of mark/space timings in microseconds, with a 38 kHz carrier and repeat count of 1.
 
-The raw timing array should be generated from the packet with `packet_to_raw_timings(packet)` from the Python code above.
+For the repo's ESPHome Native API action, generate the raw timing array with `packet_to_esphome_raw_timings(packet)`. ESPHome spaces must be negative.
 
 Expected parameters, conceptually:
 
@@ -344,9 +365,9 @@ data:
   repeat_count: 1
   timings:
     - 3100
-    - 1500
+    - -1500
     - 560
-    - 2060
+    - -2060
     # ... rest of generated raw timings
 ```
 
@@ -367,7 +388,7 @@ button:
     on_press:
       - remote_transmitter.transmit_raw:
           carrier_frequency: 38kHz
-          code: [3100, 1500, 560, 2060] # replace with full generated timing array
+          code: [3100, -1500, 560, -2060] # replace with full ESPHome signed timing array
 ```
 
 Downside: every new fixed command requires editing YAML and flashing again. That is exactly what the new proxy is meant to avoid.
@@ -412,7 +433,7 @@ Do not try to support every remote button on day one.
 Start with:
 
 - Off
-- Cool 61-72°F
+- Cool 61-72°F, plus inferred 73-88°F values awaiting capture confirmation
 - Heat 67-72°F
 - Fan auto/low/medium/high in cool mode
 - Swing on/off after confirming B8/family behavior
@@ -420,7 +441,7 @@ Start with:
 
 Then expand:
 
-- 73°F through max temp
+- 73-88°F, to confirm or correct the inferred temperature map
 - Sleep
 - Turbo
 - Anti-mildew

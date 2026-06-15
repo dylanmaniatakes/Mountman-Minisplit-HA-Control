@@ -15,6 +15,9 @@ Protocol summary:
   - zero space: 1040
   - one space: 2060
   - trailer mark: 560
+- ESPHome raw transmit lists use signed timing values:
+  - positive values are marks, where the IR carrier is on
+  - negative values are spaces, where the IR carrier is off
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from dataclasses import dataclass
 
 from homeassistant.exceptions import HomeAssistantError
 
-TEMP_MAP_F: dict[int, tuple[int, int]] = {
+KNOWN_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     61: (0x0F, 0x80),
     62: (0x0F, 0x84),
     63: (0x0E, 0x80),
@@ -36,6 +39,20 @@ TEMP_MAP_F: dict[int, tuple[int, int]] = {
     70: (0x0A, 0x80),
     71: (0x0A, 0x84),
     72: (0x09, 0x80),
+}
+
+INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    # The captured table reaches 72F. Above that, the observed pattern continues
+    # cleanly: byte 7 steps down every two Fahrenheit degrees, and byte 12
+    # alternates between 0x80 and 0x84. These higher values are intentionally
+    # marked as inferred in the docs until hardware captures confirm them.
+    temp_f: (0x09 - ((temp_f - 72) // 2), 0x84 if temp_f % 2 else 0x80)
+    for temp_f in range(73, 89)
+}
+
+TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    **KNOWN_TEMP_MAP_F,
+    **INFERRED_TEMP_MAP_F,
 }
 
 B8_FAN: dict[str, int] = {
@@ -54,6 +71,8 @@ class MountmanCommand:
     """A generated Mountman command ready for transmission."""
 
     packet: list[int]
+    # ESPHome signed raw timings. Positive values are carrier-on marks and
+    # negative values are carrier-off spaces.
     timings: list[int]
 
     @property
@@ -107,7 +126,11 @@ def build_packet(
         return parse_hex_packet(PACKET_HEX_POWER_OFF)
 
     if temp_f not in TEMP_MAP_F:
-        raise HomeAssistantError(f"Unsupported Mountman temperature: {temp_f}F")
+        valid_range = f"{min(TEMP_MAP_F)}-{max(TEMP_MAP_F)}F"
+        raise HomeAssistantError(
+            f"Unsupported Mountman temperature: {temp_f}F. "
+            f"Supported range is {valid_range}; 73-88F is inferred and still needs hardware confirmation."
+        )
 
     temp_a, temp_b = TEMP_MAP_F[temp_f]
 
@@ -142,14 +165,20 @@ def build_packet(
 
 
 def packet_to_raw_timings(packet: list[int]) -> list[int]:
-    """Convert packet bytes to ESPHome/Flipper raw IR timings."""
+    """Convert packet bytes to ESPHome signed raw IR timings.
 
-    raw = [3100, 1500]
+    ESPHome's `remote_transmitter.transmit_raw` action treats positive numbers
+    as carrier-on marks and negative numbers as carrier-off spaces. A Flipper
+    `.ir` file stores the same durations as positive numbers because the file
+    format already knows the entries alternate mark/space/mark/space.
+    """
+
+    raw = [3100, -1500]
     for byte in packet:
         for bit_index in range(8):
             bit = (byte >> bit_index) & 1
             raw.append(560)
-            raw.append(2060 if bit else 1040)
+            raw.append(-(2060 if bit else 1040))
     raw.append(560)
     return raw
 

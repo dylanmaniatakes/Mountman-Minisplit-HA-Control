@@ -15,12 +15,19 @@ action: esphome.gym_send_raw
 data:
   command:
     - 3100
-    - 1500
+    - -1500
     - 560
-    - 2060
+    - -2060
 ```
 
 The HACS integration generates the Mountman packet and timing array, then calls this action.
+
+ESPHome raw timing values are signed:
+
+- Positive numbers are marks, where the 38 kHz IR carrier is on.
+- Negative numbers are spaces, where the carrier is off.
+
+This is different from Flipper `.ir` files, which store the same alternating mark/space durations as all-positive numbers.
 
 ## What Appears In Home Assistant
 
@@ -65,4 +72,4 @@ If Home Assistant still shows an older device name or the action is missing afte
 
 The protocol is still being tested. Keeping Mountman packet generation in the HACS integration means protocol fixes can be installed through HACS without reflashing the ESPHome device.
 
-The ESPHome device only needs to know how to transmit raw 38 kHz IR timings.
+The ESPHome device only needs to know how to transmit signed raw 38 kHz IR timings.

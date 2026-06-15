@@ -43,6 +43,8 @@ from .const import (
     MOUNTMAN_FANS,
     MOUNTMAN_MODES,
     SERVICE_SEND_STATE,
+    SUPPORTED_MAX_TEMP,
+    SUPPORTED_MIN_TEMP,
 )
 from .packet import MountmanCommand, build_command
 
@@ -68,7 +70,7 @@ MOUNTMAN_TO_HA_FAN = {value: key for key, value in HA_TO_MOUNTMAN_FAN.items()}
 
 SEND_STATE_SCHEMA = {
     vol.Optional("mode"): vol.In(MOUNTMAN_MODES),
-    vol.Optional("temp_f"): vol.Coerce(int),
+    vol.Optional("temp_f"): vol.All(vol.Coerce(int), vol.Range(min=SUPPORTED_MIN_TEMP, max=SUPPORTED_MAX_TEMP)),
     vol.Optional("fan"): vol.In(MOUNTMAN_FANS),
     vol.Optional("family"): vol.In(MOUNTMAN_FAMILIES),
     vol.Optional("b8_override"): vol.Coerce(int),

@@ -108,13 +108,13 @@ action: some_domain.some_raw_send_action
 data:
   command:
     - 3100
-    - 1500
+    - -1500
     - 560
-    - 2060
+    - -2060
     # ...
 ```
 
-The `command` value is an array of alternating mark/space durations in microseconds. The transmitter should send it as raw IR at 38 kHz with one repeat.
+The `command` value is an array of alternating mark/space durations in microseconds. For ESPHome, marks are positive numbers and spaces are negative numbers. The transmitter should send it as raw IR at 38 kHz with one repeat.
 
 For ESPHome, this is typically a user-defined Native API action. A complete example is included at `esphome/xiao-ir-mate-raw-api.yaml`, and the minimal action usually looks like this conceptually:
 
@@ -145,9 +145,9 @@ action: esphome.gym_send_raw
 data:
   command:
     - 3100
-    - 1500
+    - -1500
     - 560
-    - 2060
+    - -2060
 ```
 
 That shortened payload is only a syntax/connection test. It is not a complete mini-split command. The `Send Mountman Off Test` ESPHome button and the HACS integration both send complete 227-timing Mountman packets.
@@ -181,7 +181,7 @@ Raw IR transmitter action: esphome.gym_send_raw
 Default cool packet family: normal
 Default fan mode: high
 Minimum temperature: 61
-Maximum temperature: 72
+Maximum temperature: 88
 ```
 
 The integration creates an assumed-state climate entity. Add it to a dashboard like any other thermostat/climate device.
@@ -218,6 +218,28 @@ To find the action name:
 4. Paste that value into the Mountman integration's `Raw IR transmitter action` option.
 
 If the action is missing, reload the ESPHome integration entry or restart Home Assistant. ESPHome's user-defined action names are based on the ESPHome node name, not the friendly name shown on the device page.
+
+### Troubleshooting: Phone Sees LEDs But Flipper Sees No Packet
+
+If a phone camera can see the IR LEDs firing but a Flipper cannot read a raw packet, the transmitter may be sending carrier without valid mark/space gaps.
+
+For ESPHome `remote_transmitter.transmit_raw`, spaces must be negative:
+
+```yaml
+command:
+  - 3100
+  - -1500
+  - 560
+  - -2060
+```
+
+Flipper `.ir` files use all-positive values for the same signal:
+
+```text
+data: 3100 1500 560 2060
+```
+
+Those two formats describe the same durations, but ESPHome needs the sign to know when to turn the carrier off.
 
 ### First HACS Integration Tests
 

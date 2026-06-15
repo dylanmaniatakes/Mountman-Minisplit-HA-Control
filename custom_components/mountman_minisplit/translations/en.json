@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Mountman Mini-Split IR",
-        "description": "Create an assumed-state climate entity that sends Mountman IR packets through a raw IR transmitter action. Enter an action such as esphome.gym_send_raw or esphome.gymircontroller_send_raw. Do not enter a device id, device name, or button.gym_gym_ir_send entity id.",
+        "description": "Create an assumed-state climate entity that sends Mountman IR packets through a raw IR transmitter action. Enter an action such as esphome.gym_send_raw or esphome.gymircontroller_send_raw. Do not enter a device id, device name, or button.gym_gym_ir_send entity id. The action must accept ESPHome signed timings where spaces are negative. Temperatures 61-72F are capture-backed; 73-88F are inferred for testing.",
         "data": {
           "name": "Name",
           "transmitter_action": "Raw IR transmitter action",
@@ -23,7 +23,7 @@
     "step": {
       "init": {
         "title": "Mountman Mini-Split IR options",
-        "description": "Update the raw IR transmitter action and protocol defaults without removing the climate entity. Enter an action such as esphome.gym_send_raw or esphome.gymircontroller_send_raw. Do not enter a device id, device name, or button.gym_gym_ir_send entity id.",
+        "description": "Update the raw IR transmitter action and protocol defaults without removing the climate entity. Enter an action such as esphome.gym_send_raw or esphome.gymircontroller_send_raw. Do not enter a device id, device name, or button.gym_gym_ir_send entity id. The action must accept ESPHome signed timings where spaces are negative. Temperatures 61-72F are capture-backed; 73-88F are inferred for testing.",
         "data": {
           "transmitter_action": "Raw IR transmitter action",
           "packet_family": "Default cool packet family",

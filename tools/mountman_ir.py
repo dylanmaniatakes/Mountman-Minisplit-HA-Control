@@ -66,9 +66,8 @@ BIT_SPACE_RANGE = (750, 2400)
 BIT_ONE_THRESHOLD_US = 1500
 
 # Temperature is split across byte 7 and byte 12. It is not a simple "temp =
-# byte + offset" field. This table is the current known/predicted map from the
-# captures, and it should stay conservative until more temperatures are tested.
-TEMP_MAP_F: dict[int, tuple[int, int]] = {
+# byte + offset" field. This table begins with values recovered from captures.
+KNOWN_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     61: (0x0F, 0x80),
     62: (0x0F, 0x84),
     63: (0x0E, 0x80),
@@ -81,6 +80,20 @@ TEMP_MAP_F: dict[int, tuple[int, int]] = {
     70: (0x0A, 0x80),
     71: (0x0A, 0x84),
     72: (0x09, 0x80),
+}
+
+INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    # The known table shows byte 7 stepping down every two Fahrenheit degrees
+    # while byte 12 alternates between 0x80 and 0x84. The 73-88F values below
+    # continue that pattern so they can be tested from Home Assistant, but they
+    # should be treated as predicted until captures confirm them.
+    temp_f: (0x09 - ((temp_f - 72) // 2), 0x84 if temp_f % 2 else 0x80)
+    for temp_f in range(73, 89)
+}
+
+TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    **KNOWN_TEMP_MAP_F,
+    **INFERRED_TEMP_MAP_F,
 }
 
 # Byte 8 appears to pack fan and/or swing/louver state. The names here describe
@@ -191,11 +204,16 @@ def packet_to_hex(packet: Sequence[int]) -> str:
 
 
 def packet_to_raw_timings(packet: Sequence[int]) -> list[int]:
-    """Convert a 14-byte packet into raw IR mark/space timings.
+    """Convert a 14-byte packet into Flipper-style raw IR timings.
 
-    Flipper and ESPHome both accept raw IR as a list like:
+    Flipper `.ir` files store raw IR as a list like:
 
         header mark, header space, bit mark, bit space, bit mark, bit space...
+
+    All values are positive because the Flipper file format knows the numbers
+    alternate mark/space/mark/space. ESPHome's `transmit_raw` action is
+    different: ESPHome wants marks as positive values and spaces as negative
+    values. Use `packet_to_esphome_raw_timings` for that format.
 
     The Mountman packet is encoded LSB-first inside each byte. LSB-first means
     "least significant bit first": bit 0 is transmitted before bit 1, bit 1
@@ -216,6 +234,23 @@ def packet_to_raw_timings(packet: Sequence[int]) -> list[int]:
             raw.append(ONE_SPACE_US if bit else ZERO_SPACE_US)
     raw.append(TRAILER_MARK_US)
     return raw
+
+
+def packet_to_esphome_raw_timings(packet: Sequence[int]) -> list[int]:
+    """Convert a 14-byte packet into ESPHome signed raw IR timings.
+
+    ESPHome uses the sign of each number to distinguish marks from spaces:
+
+    - positive values mean carrier-on marks
+    - negative values mean carrier-off spaces
+
+    Sending Flipper-style all-positive timings to ESPHome produces visible IR
+    LED activity, but the receiver sees one long carrier burst instead of a
+    readable mark/space packet.
+    """
+
+    flipper_raw = packet_to_raw_timings(packet)
+    return [value if index % 2 == 0 else -value for index, value in enumerate(flipper_raw)]
 
 
 def raw_timings_to_packet(timings: Sequence[int], start_index: int = 0) -> list[int] | None:
@@ -508,6 +543,8 @@ def _print_generate(args: argparse.Namespace) -> int:
         content = packet_to_hex(packet) + "\n"
     elif args.output_format == "raw":
         content = " ".join(str(value) for value in packet_to_raw_timings(packet)) + "\n"
+    elif args.output_format == "esphome-raw":
+        content = " ".join(str(value) for value in packet_to_esphome_raw_timings(packet)) + "\n"
     elif args.output_format == "flipper":
         content = flipper_file([(args.name, packet)])
     elif args.output_format == "ha-yaml":
@@ -534,21 +571,18 @@ def _write_first_tests(args: argparse.Namespace) -> int:
 def _ha_yaml(packet: Sequence[int]) -> str:
     """Render a Home Assistant-style raw IR action payload.
 
-    This is intentionally labeled as a helper, not a guaranteed final service
-    call. Home Assistant and ESPHome IR proxy support is new/experimental, so
-    the exact action name and field names may shift. The timing data itself is
-    the useful part.
+    The action name is the repo's default ESPHome node/action pairing. If a user
+    changes the ESPHome node name, the action name changes too. The timing
+    values are the important piece: they are ESPHome signed timings where spaces
+    are negative.
     """
 
-    timings = packet_to_raw_timings(packet)
+    timings = packet_to_esphome_raw_timings(packet)
     timing_lines = "\n".join(f"    - {value}" for value in timings)
     return (
-        "target:\n"
-        "  entity_id: infrared.mountman_ir_proxy_transmitter\n"
+        "action: esphome.gym_send_raw\n"
         "data:\n"
-        "  carrier_frequency: 38000\n"
-        "  repeat_count: 1\n"
-        "  timings:\n"
+        "  command:\n"
         f"{timing_lines}\n"
     )
 
@@ -571,7 +605,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     generate.add_argument("--family", choices=["normal", "alternate"], default="normal")
     generate.add_argument("--b8", type=lambda value: int(value, 0), help="Override byte 8, e.g. 0x05")
     generate.add_argument("--name", default="MOUNTMAN_GENERATED")
-    generate.add_argument("--format", dest="output_format", choices=["packet", "raw", "flipper", "ha-yaml"], default="packet")
+    generate.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["packet", "raw", "esphome-raw", "flipper", "ha-yaml"],
+        default="packet",
+    )
     generate.add_argument("--out")
     generate.set_defaults(func=_print_generate)
 

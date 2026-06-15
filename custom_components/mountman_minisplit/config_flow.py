@@ -23,13 +23,15 @@ from .const import (
     ENTITY_DOMAINS_THAT_NEED_TARGETS,
     MOUNTMAN_FAMILIES,
     MOUNTMAN_FANS,
+    SUPPORTED_MAX_TEMP,
+    SUPPORTED_MIN_TEMP,
 )
 
 
 class MountmanMiniSplitConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Mountman Mini-Split IR."""
 
-    VERSION = 1
+    VERSION = 2
 
     @staticmethod
     def async_get_options_flow(config_entry):
@@ -109,8 +111,12 @@ def _user_schema(defaults: dict | None = None) -> vol.Schema:
                 CONF_DEFAULT_FAN,
                 default=defaults.get(CONF_DEFAULT_FAN, DEFAULT_FAN_MODE),
             ): vol.In(MOUNTMAN_FANS),
-            vol.Required(CONF_MIN_TEMP, default=defaults.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)): int,
-            vol.Required(CONF_MAX_TEMP, default=defaults.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)): int,
+            vol.Required(CONF_MIN_TEMP, default=defaults.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)): vol.All(
+                vol.Coerce(int), vol.Range(min=SUPPORTED_MIN_TEMP, max=SUPPORTED_MAX_TEMP)
+            ),
+            vol.Required(CONF_MAX_TEMP, default=defaults.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)): vol.All(
+                vol.Coerce(int), vol.Range(min=SUPPORTED_MIN_TEMP, max=SUPPORTED_MAX_TEMP)
+            ),
         }
     )
 
@@ -138,8 +144,12 @@ def _options_schema(defaults: dict) -> vol.Schema:
                 CONF_DEFAULT_FAN,
                 default=defaults.get(CONF_DEFAULT_FAN, DEFAULT_FAN_MODE),
             ): vol.In(MOUNTMAN_FANS),
-            vol.Required(CONF_MIN_TEMP, default=defaults.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)): int,
-            vol.Required(CONF_MAX_TEMP, default=defaults.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)): int,
+            vol.Required(CONF_MIN_TEMP, default=defaults.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)): vol.All(
+                vol.Coerce(int), vol.Range(min=SUPPORTED_MIN_TEMP, max=SUPPORTED_MAX_TEMP)
+            ),
+            vol.Required(CONF_MAX_TEMP, default=defaults.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)): vol.All(
+                vol.Coerce(int), vol.Range(min=SUPPORTED_MIN_TEMP, max=SUPPORTED_MAX_TEMP)
+            ),
         }
     )
 

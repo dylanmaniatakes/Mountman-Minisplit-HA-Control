@@ -40,6 +40,26 @@ class MountmanIrTests(unittest.TestCase):
         self.assertEqual(ir.packet_to_hex(cool_72_normal_b8_05), "23 CB 26 01 00 24 03 09 05 00 00 00 80 CA")
         self.assertEqual(ir.packet_to_hex(cool_72_alt_high), "23 CB 26 01 00 64 03 09 3D 00 00 00 80 42")
 
+    def test_generate_inferred_temperature_packets(self) -> None:
+        """Temperatures above the capture range should follow the documented pattern."""
+
+        heat_73 = ir.build_mountman_packet(mode="heat", temp_f=73)
+        heat_88 = ir.build_mountman_packet(mode="heat", temp_f=88)
+
+        self.assertEqual(ir.packet_to_hex(heat_73), "23 CB 26 01 00 24 01 09 05 00 00 00 84 CC")
+        self.assertEqual(ir.packet_to_hex(heat_88), "23 CB 26 01 00 24 01 01 05 00 00 00 80 C0")
+
+    def test_esphome_raw_timings_use_negative_spaces(self) -> None:
+        """ESPHome raw timings must mark spaces with negative durations."""
+
+        packet = ir.build_mountman_packet(mode="heat", temp_f=72)
+        timings = ir.packet_to_esphome_raw_timings(packet)
+
+        self.assertEqual(len(timings), 227)
+        self.assertEqual(timings[:6], [3100, -1500, 560, -2060, 560, -2060])
+        self.assertTrue(all(value > 0 for value in timings[0::2]))
+        self.assertTrue(all(value < 0 for value in timings[1::2]))
+
     def test_decode_updated_capture_has_expected_packets(self) -> None:
         """The decoder should recover known packets from the real capture file."""
 

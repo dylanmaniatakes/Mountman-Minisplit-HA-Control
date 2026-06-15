@@ -27,6 +27,8 @@ ESPHome note: the raw sender is a Native API action, not a normal device entity.
 
 Do not configure the Mountman integration with an ESPHome device id or a button entity such as `button.gym_gym_ir_send`. The integration must call a raw-send action that accepts a `command` timing array. The Seeed factory firmware's Send button can replay a learned slot, but it cannot accept the generated Mountman packet.
 
+ESPHome timing note: ESPHome raw transmit actions use signed timings. Marks are positive and spaces are negative, for example `3100, -1500, 560, -2060`. Flipper `.ir` files store the same mark/space durations as all-positive numbers because the file format already knows they alternate.
+
 ### Flipper Zero
 
 1. Copy `flipper-tests/MOUNTMAN_FIRST_TESTS.ir` to the Flipper.
@@ -91,9 +93,10 @@ python3 -m unittest discover -v
 Generator output formats:
 
 - `packet` - 14-byte packet as hex.
-- `raw` - timing list suitable for ESPHome/Home Assistant raw IR sends.
+- `raw` - Flipper-style all-positive raw timing list.
+- `esphome-raw` - ESPHome `transmit_raw` timing list with negative space values.
 - `flipper` - complete Flipper `.ir` file.
-- `ha-yaml` - conceptual Home Assistant action payload. Confirm the exact action schema in the installed HA/ESPHome version before using it directly.
+- `ha-yaml` - Home Assistant action payload for the ESPHome user-defined raw sender.
 
 ## Signal format
 
@@ -251,8 +254,12 @@ Known values:
 | 70°F | `0A` | `80` |
 | 71°F | `0A` | `84` |
 | 72°F | `09` | `80` |
+| 73°F | `09` | `84` inferred |
+| 74°F | `08` | `80` inferred |
+| ... | ... | ... |
+| 88°F | `01` | `80` inferred |
 
-A first-pass mapping function for known captured/predicted values:
+A first-pass mapping for captured and inferred values:
 
 ```python
 TEMP_MAP_F = {
@@ -268,6 +275,9 @@ TEMP_MAP_F = {
     70: (0x0A, 0x80),
     71: (0x0A, 0x84),
     72: (0x09, 0x80),
+    73: (0x09, 0x84), # inferred
+    74: (0x08, 0x80), # inferred
+    # Continue the same pattern through 88F.
 }
 ```
 
@@ -325,7 +335,7 @@ for name, packet, checksum_ok in decode_flipper_ir("Remote2.ir"):
         print(f"{name}: no decode")
 ```
 
-### Build raw timings from a 14-byte packet
+### Build Flipper-style raw timings from a 14-byte packet
 
 ```python
 def packet_to_raw_timings(packet: list[int]) -> list[int]:
@@ -337,6 +347,21 @@ def packet_to_raw_timings(packet: list[int]) -> list[int]:
             raw.append(2060 if bit else 1040)
     raw.append(560)
     return raw
+```
+
+### Build ESPHome signed raw timings from a 14-byte packet
+
+```python
+def packet_to_esphome_raw_timings(packet: list[int]) -> list[int]:
+    """Return timings for ESPHome remote_transmitter.transmit_raw.
+
+    ESPHome uses positive values for carrier-on marks and negative values for
+    carrier-off spaces. Flipper files use all-positive values because their raw
+    file format already knows the values alternate mark/space.
+    """
+
+    flipper_raw = packet_to_raw_timings(packet)
+    return [value if index % 2 == 0 else -value for index, value in enumerate(flipper_raw)]
 ```
 
 ### Create a Flipper `.ir` file from a 13-byte payload
@@ -413,7 +438,7 @@ capture_new_new_3
 - Confirm which 72°F cool candidate the unit accepts:
   - `23 CB 26 01 00 24 03 09 05 00 00 00 80 CA`
   - `23 CB 26 01 00 64 03 09 3D 00 00 00 80 42`
-- Capture 73°F through max temperature if full climate control is desired.
+- Capture 73-88°F to confirm or correct the inferred temperature map.
 - Re-test `Mute_on_new`; it decodes as `23 CB 26 02 00 20 00 00 00 00 00 00 00 45`, but does not match the normal checksum formula. It may be a special frame or a bad capture.
 - Determine exactly how byte 5 `24` vs `64` should be interpreted. Current theory: `24` is normal on-state family and `64` is a display/turbo/sleep/alternate cool family.
 - Determine if byte 8 fully represents fan and swing, or if some swing state is also packed into byte 5 or another feature byte.
