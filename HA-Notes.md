@@ -18,6 +18,16 @@ References:
 
 Important caveat: ESPHome marks the IR/RF proxy and infrared component as experimental. Exact service/action naming in Home Assistant may shift while the API settles. Use Developer Tools > Actions to inspect the currently exposed actions for the ESPHome infrared entity.
 
+## Current setup files
+
+For the Seeed Studio XIAO IR Mate path:
+
+- `custom_components/mountman_minisplit/` is the HACS-installable Home Assistant custom integration.
+- `esphome/xiao-ir-mate-raw-api.yaml` is a manual ESPHome firmware example. HACS does not install or manage it.
+- `home-assistant/SETUP.md` explains how to interpret the factory firmware's Send button entity, such as `button.gym_gym_ir_send`, how to install the HACS integration, and what raw transmitter action the integration expects.
+
+The factory firmware Send button is useful for replaying a learned slot. Full Mountman control is better served by the HACS integration plus a user-provided raw-send action because mini-split commands are full-state packets.
+
 ## Recommended hardware
 
 Use an ESP32-based IR blaster/proxy if possible.

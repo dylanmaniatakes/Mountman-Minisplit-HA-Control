@@ -16,10 +16,12 @@ Treat these findings as evidence for this captured remote/unit family, not as a 
 
 ### Home Assistant / ESPHome
 
-1. Read `HA-Notes.md` for the ESPHome IR proxy setup and Home Assistant helper design.
-2. Test a known captured command before building dashboards or automations.
-3. Use `tools/mountman_ir.py` to generate raw timings for Home Assistant or ESPHome.
-4. Keep in mind that IR is one-way: Home Assistant will only know the state it last sent unless an IR receiver is also used.
+1. For a Seeed Studio XIAO IR Mate, read `home-assistant/SETUP.md`.
+2. Provide a Home Assistant action that can transmit raw IR timing arrays at 38 kHz. The repo includes `esphome/xiao-ir-mate-raw-api.yaml` as a manual ESPHome firmware example, but HACS does not install or manage that file.
+3. Install this repository in HACS as a custom integration.
+4. Add the `Mountman Mini-Split IR` integration in Home Assistant and point it at the raw IR transmitter action.
+5. Test a known captured command before building dashboards or automations.
+6. Keep in mind that IR is one-way: Home Assistant will only know the state it last sent unless an IR receiver is also used.
 
 ### Flipper Zero
 
@@ -47,6 +49,11 @@ This repo includes a small toolchain so the protocol notes are reproducible and 
 
 - `tools/mountman_ir.py` decodes Flipper raw captures, builds Mountman packets, converts packets to raw timings, and writes Flipper `.ir` files.
 - `flipper-tests/MOUNTMAN_FIRST_TESTS.ir` contains the first real-world test bundle: captured heat 72°F, both predicted cool 72°F candidates, and captured power off.
+- `custom_components/mountman_minisplit/` is the HACS-installable Home Assistant custom integration.
+- `esphome/xiao-ir-mate-raw-api.yaml` is a manual ESPHome firmware example for exposing a raw IR send action.
+- `esphome/README.md` explains that firmware files are manual-use only and are not installed by HACS.
+- `home-assistant/SETUP.md` explains the Seeed factory firmware path, HACS install path, and raw transmitter action requirement.
+- `RELEASING.md` explains how to tag test releases so HACS can manage versions during protocol testing.
 - `tests/test_mountman_ir.py` checks checksum math, packet generation, and capture decoding against known packets.
 
 Code comments are intentionally explicit. Protocol assumptions, bit-order decisions, and test reasons should be explained in the codebase so the project remains approachable for readers with different experience levels.

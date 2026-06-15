@@ -1,0 +1,141 @@
+# Generic raw IR sender firmware for the Seeed Studio XIAO IR Mate.
+#
+# This file is included for manual ESPHome flashing. HACS does not install it,
+# copy it, or manage it. The Home Assistant custom integration only expects that
+# some raw IR transmitter action exists.
+#
+# Recommended pairing:
+#
+# - Flash this YAML manually through ESPHome.
+# - Install the HACS `mountman_minisplit` integration.
+# - Configure the integration to call `esphome.gym_send_raw`, or the matching
+#   action name for the chosen ESPHome node name.
+#
+# Data contract expected by the HACS integration:
+#
+#   action: esphome.gym_send_raw
+#   data:
+#     command: [3100, 1500, 560, 2060, ...]
+#
+# The `command` array is alternating mark/space durations in microseconds.
+
+substitutions:
+  name: "gym"
+  friendly_name: "Gym IR Sender"
+
+esphome:
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+  project:
+    name: "mountman.raw_ir_sender"
+    version: "0.1.0"
+
+esp32:
+  board: seeed_xiao_esp32c3
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+
+api:
+  actions:
+    - action: send_raw
+      variables:
+        # Alternating mark/space durations in microseconds.
+        command: int[]
+      then:
+        - lambda: |-
+            ESP_LOGI("raw_ir", "Sending raw IR command with %d timings", command.size());
+        - remote_transmitter.transmit_raw:
+            carrier_frequency: 38kHz
+            code: !lambda "return command;"
+            repeat:
+              times: 1
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "${friendly_name} Setup"
+    password: "12345678"
+
+captive_portal:
+
+# Seeed Studio XIAO IR Mate hardware mapping:
+# - D1 / GPIO3: IR transmitter LEDs
+# - D2 / GPIO4: IR receiver
+# - D5 / GPIO7: onboard RGB status LED
+# - D3 / GPIO5: touch input
+# - D4 / GPIO6: vibration motor
+# - D9 / GPIO9: reset button
+remote_transmitter:
+  id: ir_tx
+  pin: GPIO3
+  carrier_duty_percent: 50%
+
+remote_receiver:
+  id: ir_rx
+  pin:
+    number: GPIO4
+    inverted: true
+  dump: raw
+
+button:
+  - platform: restart
+    name: "Restart"
+    entity_category: config
+    disabled_by_default: true
+    icon: mdi:restart
+
+  - platform: factory_reset
+    name: "Factory Reset"
+    entity_category: diagnostic
+    disabled_by_default: true
+
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO7
+    num_leds: 1
+    chipset: WS2812
+    name: "Status LED"
+    id: status_led
+    rmt_symbols: 48
+
+output:
+  - platform: gpio
+    id: vibration_output
+    pin: GPIO6
+
+switch:
+  - platform: output
+    id: vibration_switch
+    name: "Vibration Motor"
+    output: vibration_output
+    disabled_by_default: true
+
+binary_sensor:
+  - platform: gpio
+    id: touch_pad
+    name: "Touch Button"
+    pin:
+      number: GPIO5
+      mode: INPUT_PULLDOWN
+    on_press:
+      then:
+        - switch.turn_on: vibration_switch
+        - delay: 100ms
+        - switch.turn_off: vibration_switch
+
+  - platform: gpio
+    id: reset_button
+    name: "Reset Button"
+    disabled_by_default: true
+    pin:
+      number: GPIO9
+      mode: INPUT_PULLUP
+      inverted: true

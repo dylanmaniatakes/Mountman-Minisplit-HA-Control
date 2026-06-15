@@ -1,0 +1,56 @@
+send_state:
+  name: Send Mountman state
+  description: Send an explicit Mountman mini-split IR state through the selected climate entity.
+  target:
+    entity:
+      integration: mountman_minisplit
+      domain: climate
+  fields:
+    mode:
+      name: Mode
+      description: Mountman mode to send. Omit to use the current climate entity mode.
+      selector:
+        select:
+          options:
+            - "off"
+            - "cool"
+            - "heat"
+            - "dry"
+            - "fan_only"
+    temp_f:
+      name: Temperature
+      description: Fahrenheit setpoint. Known range is currently 61-72F.
+      selector:
+        number:
+          min: 61
+          max: 72
+          step: 1
+          mode: box
+    fan:
+      name: Fan
+      description: Fan setting to send. Omit to use the current climate entity fan mode.
+      selector:
+        select:
+          options:
+            - "auto"
+            - "low"
+            - "medium"
+            - "high"
+            - "offish"
+    family:
+      name: Packet family
+      description: Cool-mode packet family. Normal uses byte 5 = 0x24; alternate uses byte 5 = 0x64.
+      selector:
+        select:
+          options:
+            - "normal"
+            - "alternate"
+    b8_override:
+      name: Byte 8 override
+      description: Optional decimal byte-8 override for fan/swing testing. Use 5 for 0x05 or 61 for 0x3D.
+      selector:
+        number:
+          min: -1
+          max: 255
+          step: 1
+          mode: box

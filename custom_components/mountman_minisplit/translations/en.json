@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mountman Mini-Split IR",
+        "description": "Create an assumed-state climate entity that sends Mountman IR packets through a raw IR transmitter action.",
+        "data": {
+          "name": "Name",
+          "transmitter_action": "Raw IR transmitter action",
+          "packet_family": "Default cool packet family",
+          "default_fan": "Default fan mode",
+          "min_temp": "Minimum temperature",
+          "max_temp": "Maximum temperature"
+        }
+      }
+    },
+    "error": {
+      "invalid_action": "Action must look like domain.service, for example esphome.gym_send_raw."
+    }
+  }
+}
