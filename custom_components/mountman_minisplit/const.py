@@ -14,6 +14,8 @@ DEFAULT_FAN_MODE = "high"
 DEFAULT_TARGET_TEMP = 72
 DEFAULT_MIN_TEMP = 61
 DEFAULT_MAX_TEMP = 88
+DEFAULT_REPEAT_COUNT = 1
+DEFAULT_REPEAT_DELAY_MS = 90
 SUPPORTED_MIN_TEMP = 61
 SUPPORTED_MAX_TEMP = 88
 
@@ -22,6 +24,8 @@ CONF_PACKET_FAMILY = "packet_family"
 CONF_DEFAULT_FAN = "default_fan"
 CONF_MIN_TEMP = "min_temp"
 CONF_MAX_TEMP = "max_temp"
+CONF_REPEAT_COUNT = "repeat_count"
+CONF_REPEAT_DELAY_MS = "repeat_delay_ms"
 
 MOUNTMAN_MODES = ["off", "cool", "heat", "dry", "fan_only"]
 MOUNTMAN_FANS = ["auto", "low", "medium", "high", "offish"]
@@ -46,3 +50,4 @@ ENTITY_DOMAINS_THAT_NEED_TARGETS = {
 }
 
 SERVICE_SEND_STATE = "send_state"
+SERVICE_SEND_PACKET = "send_packet"

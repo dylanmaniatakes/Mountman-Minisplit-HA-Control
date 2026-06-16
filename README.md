@@ -29,6 +29,18 @@ Do not configure the Mountman integration with an ESPHome device id or a button 
 
 ESPHome timing note: ESPHome raw transmit actions use signed timings. Marks are positive and spaces are negative, for example `3100, -1500, 560, -2060`. Flipper `.ir` files store the same mark/space durations as all-positive numbers because the file format already knows they alternate.
 
+Hardware debugging note: if a Flipper can see ESPHome packets but the mini-split does not respond, use the `mountman_minisplit.send_packet` service to send the exact captured `Heat_72` packet:
+
+```yaml
+action: mountman_minisplit.send_packet
+target:
+  entity_id: climate.mountman_mini_split
+data:
+  packet_hex: "23 CB 26 01 00 24 01 09 05 00 00 00 80 C8"
+```
+
+That test bypasses the high-level climate mapping. If the exact packet works from Flipper but not from ESPHome, investigate emitter strength, aim, duty cycle, carrier accuracy, and ESPHome timing quality.
+
 ### Flipper Zero
 
 1. Copy `flipper-tests/MOUNTMAN_FIRST_TESTS.ir` to the Flipper.

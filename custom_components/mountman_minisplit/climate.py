@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -30,11 +31,15 @@ from .const import (
     CONF_MAX_TEMP,
     CONF_MIN_TEMP,
     CONF_PACKET_FAMILY,
+    CONF_REPEAT_COUNT,
+    CONF_REPEAT_DELAY_MS,
     CONF_TRANSMITTER_ACTION,
     DEFAULT_FAN_MODE,
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_TEMP,
     DEFAULT_PACKET_FAMILY,
+    DEFAULT_REPEAT_COUNT,
+    DEFAULT_REPEAT_DELAY_MS,
     DEFAULT_TARGET_TEMP,
     DEFAULT_TRANSMITTER_ACTION,
     DOMAIN,
@@ -42,11 +47,12 @@ from .const import (
     MOUNTMAN_FAMILIES,
     MOUNTMAN_FANS,
     MOUNTMAN_MODES,
+    SERVICE_SEND_PACKET,
     SERVICE_SEND_STATE,
     SUPPORTED_MAX_TEMP,
     SUPPORTED_MIN_TEMP,
 )
-from .packet import MountmanCommand, build_command
+from .packet import MountmanCommand, build_command, build_command_from_packet_hex
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,6 +80,14 @@ SEND_STATE_SCHEMA = {
     vol.Optional("fan"): vol.In(MOUNTMAN_FANS),
     vol.Optional("family"): vol.In(MOUNTMAN_FAMILIES),
     vol.Optional("b8_override"): vol.Coerce(int),
+    vol.Optional("repeat_count"): vol.All(vol.Coerce(int), vol.Range(min=1, max=5)),
+    vol.Optional("repeat_delay_ms"): vol.All(vol.Coerce(int), vol.Range(min=40, max=500)),
+}
+
+SEND_PACKET_SCHEMA = {
+    vol.Required("packet_hex"): str,
+    vol.Optional("repeat_count"): vol.All(vol.Coerce(int), vol.Range(min=1, max=5)),
+    vol.Optional("repeat_delay_ms"): vol.All(vol.Coerce(int), vol.Range(min=40, max=500)),
 }
 
 
@@ -87,6 +101,11 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
             SERVICE_SEND_STATE,
             SEND_STATE_SCHEMA,
             "async_send_state_service",
+        )
+        platform.async_register_entity_service(
+            SERVICE_SEND_PACKET,
+            SEND_PACKET_SCHEMA,
+            "async_send_packet_service",
         )
         domain_data["entity_services_registered"] = True
 
@@ -135,11 +154,14 @@ class MountmanMiniSplitClimate(ClimateEntity, RestoreEntity):
         self._default_fan = config.get(CONF_DEFAULT_FAN, DEFAULT_FAN_MODE)
         self._attr_min_temp = config.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)
         self._attr_max_temp = config.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)
+        self._repeat_count = config.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT)
+        self._repeat_delay_ms = config.get(CONF_REPEAT_DELAY_MS, DEFAULT_REPEAT_DELAY_MS)
 
         self._attr_hvac_mode = HVACMode.OFF
         self._attr_target_temperature = DEFAULT_TARGET_TEMP
         self._attr_fan_mode = MOUNTMAN_TO_HA_FAN.get(self._default_fan, FAN_HIGH)
         self._last_packet_hex: str | None = None
+        self._last_timing_count: int | None = None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -148,9 +170,13 @@ class MountmanMiniSplitClimate(ClimateEntity, RestoreEntity):
         attrs: dict[str, Any] = {
             "transmitter_action": self._transmitter_action,
             "packet_family": self._packet_family,
+            "repeat_count": self._repeat_count,
+            "repeat_delay_ms": self._repeat_delay_ms,
         }
         if self._last_packet_hex:
             attrs["last_packet"] = self._last_packet_hex
+        if self._last_timing_count:
+            attrs["last_timing_count"] = self._last_timing_count
         return attrs
 
     async def async_added_to_hass(self) -> None:
@@ -217,6 +243,8 @@ class MountmanMiniSplitClimate(ClimateEntity, RestoreEntity):
         fan: str | None = None,
         family: str | None = None,
         b8_override: int | None = None,
+        repeat_count: int | None = None,
+        repeat_delay_ms: int | None = None,
     ) -> None:
         """Entity service for sending explicit test states.
 
@@ -230,6 +258,30 @@ class MountmanMiniSplitClimate(ClimateEntity, RestoreEntity):
             fan=fan or HA_TO_MOUNTMAN_FAN.get(self._attr_fan_mode, self._default_fan),
             family=family or self._packet_family,
             b8_override=b8_override,
+            repeat_count=repeat_count,
+            repeat_delay_ms=repeat_delay_ms,
+        )
+        self.async_write_ha_state()
+
+    async def async_send_packet_service(
+        self,
+        packet_hex: str,
+        repeat_count: int | None = None,
+        repeat_delay_ms: int | None = None,
+    ) -> None:
+        """Entity service for sending an exact captured packet.
+
+        This is the most direct diagnostic path. If the exact captured
+        `Heat_72` packet does not control the unit from ESPHome but does control
+        it from Flipper, the remaining issue is likely transmitter strength,
+        carrier quality, aim, or timing distortion rather than packet contents.
+        """
+
+        command = build_command_from_packet_hex(packet_hex)
+        await self._async_send_command(
+            command,
+            repeat_count=repeat_count,
+            repeat_delay_ms=repeat_delay_ms,
         )
         self.async_write_ha_state()
 
@@ -242,6 +294,8 @@ class MountmanMiniSplitClimate(ClimateEntity, RestoreEntity):
             fan=HA_TO_MOUNTMAN_FAN.get(self._attr_fan_mode, self._default_fan),
             family=self._packet_family,
             b8_override=None,
+            repeat_count=None,
+            repeat_delay_ms=None,
         )
 
     async def _async_send_mountman_state(
@@ -252,6 +306,8 @@ class MountmanMiniSplitClimate(ClimateEntity, RestoreEntity):
         fan: str,
         family: str,
         b8_override: int | None,
+        repeat_count: int | None,
+        repeat_delay_ms: int | None,
     ) -> None:
         """Build the command and call the configured ESPHome action."""
 
@@ -262,9 +318,30 @@ class MountmanMiniSplitClimate(ClimateEntity, RestoreEntity):
             family=family,
             b8_override=b8_override,
         )
-        self._last_packet_hex = command.packet_hex
+        await self._async_send_command(
+            command,
+            repeat_count=repeat_count,
+            repeat_delay_ms=repeat_delay_ms,
+        )
 
-        await self._async_call_action({"command": command.timings}, command)
+    async def _async_send_command(
+        self,
+        command: MountmanCommand,
+        *,
+        repeat_count: int | None,
+        repeat_delay_ms: int | None,
+    ) -> None:
+        """Send one generated or captured command, optionally more than once."""
+
+        repeats = repeat_count if repeat_count is not None else self._repeat_count
+        delay_ms = repeat_delay_ms if repeat_delay_ms is not None else self._repeat_delay_ms
+        self._last_packet_hex = command.packet_hex
+        self._last_timing_count = len(command.timings)
+
+        for send_index in range(repeats):
+            await self._async_call_action({"command": command.timings}, command)
+            if send_index < repeats - 1:
+                await asyncio.sleep(delay_ms / 1000)
 
     async def _async_call_action(self, service_data: dict[str, Any], command: MountmanCommand) -> None:
         """Call the configured Home Assistant action/service."""

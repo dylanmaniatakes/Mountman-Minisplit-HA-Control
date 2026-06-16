@@ -22,9 +22,9 @@ The integration does not talk to an ESPHome device id directly. It calls a Home 
 data:
   command:
     - 3100
-    - 1500
+    - -1500
     - 560
-    - 2060
+    - -2060
     # ...
 ```
 
@@ -182,6 +182,8 @@ Default cool packet family: normal
 Default fan mode: high
 Minimum temperature: 61
 Maximum temperature: 88
+Repeat count: 1
+Repeat delay in milliseconds: 90
 ```
 
 The integration creates an assumed-state climate entity. Add it to a dashboard like any other thermostat/climate device.
@@ -218,6 +220,42 @@ To find the action name:
 4. Paste that value into the Mountman integration's `Raw IR transmitter action` option.
 
 If the action is missing, reload the ESPHome integration entry or restart Home Assistant. ESPHome's user-defined action names are based on the ESPHome node name, not the friendly name shown on the device page.
+
+### Troubleshooting: Flipper Sees Packets But The Mini-Split Does Not Respond
+
+If a Flipper can recognize the ESPHome output as IR packets, the raw waveform is much closer. The next question is whether the packet bytes match a known working capture and whether the mini-split receiver is getting a strong enough signal.
+
+First send the exact captured heat 72F packet:
+
+```yaml
+action: mountman_minisplit.send_packet
+target:
+  entity_id: climate.mountman_mini_split
+data:
+  packet_hex: "23 CB 26 01 00 24 01 09 05 00 00 00 80 C8"
+```
+
+Then try the same packet repeated three times:
+
+```yaml
+action: mountman_minisplit.send_packet
+target:
+  entity_id: climate.mountman_mini_split
+data:
+  packet_hex: "23 CB 26 01 00 24 01 09 05 00 00 00 80 C8"
+  repeat_count: 3
+  repeat_delay_ms: 90
+```
+
+If the Flipper-generated `MOUNTMAN_HEAT_72_CAPTURED` entry controls the mini-split but this exact ESPHome packet does not, the remaining likely causes are transmitter strength, aim, carrier duty/frequency accuracy, or timing distortion from the ESPHome output path.
+
+Use the Flipper as a comparator:
+
+1. Capture the original remote or the known-good Flipper replay.
+2. Capture the ESPHome replay from the same distance and angle.
+3. Compare the decoded packet bytes and rough timing values.
+
+The Mountman climate entity exposes the last sent packet as the `last_packet` state attribute. That value should match the packet being tested above.
 
 ### Troubleshooting: Phone Sees LEDs But Flipper Sees No Packet
 

@@ -54,3 +54,55 @@ send_state:
           max: 255
           step: 1
           mode: box
+    repeat_count:
+      name: Repeat count
+      description: Number of times to send the same frame for this test call. Omit to use the integration default.
+      selector:
+        number:
+          min: 1
+          max: 5
+          step: 1
+          mode: box
+    repeat_delay_ms:
+      name: Repeat delay
+      description: Gap between repeated frames in milliseconds. Omit to use the integration default.
+      selector:
+        number:
+          min: 40
+          max: 500
+          step: 10
+          mode: box
+
+send_packet:
+  name: Send exact Mountman packet
+  description: Send one exact captured or predicted 14-byte Mountman packet through the selected climate entity.
+  target:
+    entity:
+      integration: mountman_minisplit
+      domain: climate
+  fields:
+    packet_hex:
+      name: Packet hex
+      required: true
+      description: Exact 14-byte packet. Spaces are optional; the checksum byte is validated before sending.
+      example: "23 CB 26 01 00 24 01 09 05 00 00 00 80 C8"
+      selector:
+        text:
+    repeat_count:
+      name: Repeat count
+      description: Number of times to send the packet for this test call. Omit to use the integration default.
+      selector:
+        number:
+          min: 1
+          max: 5
+          step: 1
+          mode: box
+    repeat_delay_ms:
+      name: Repeat delay
+      description: Gap between repeated frames in milliseconds. Omit to use the integration default.
+      selector:
+        number:
+          min: 40
+          max: 500
+          step: 10
+          mode: box

@@ -12,12 +12,16 @@ from .const import (
     CONF_MAX_TEMP,
     CONF_MIN_TEMP,
     CONF_PACKET_FAMILY,
+    CONF_REPEAT_COUNT,
+    CONF_REPEAT_DELAY_MS,
     CONF_TRANSMITTER_ACTION,
     DEFAULT_FAN_MODE,
     DEFAULT_MAX_TEMP,
     DEFAULT_MIN_TEMP,
     DEFAULT_NAME,
     DEFAULT_PACKET_FAMILY,
+    DEFAULT_REPEAT_COUNT,
+    DEFAULT_REPEAT_DELAY_MS,
     DEFAULT_TRANSMITTER_ACTION,
     DOMAIN,
     ENTITY_DOMAINS_THAT_NEED_TARGETS,
@@ -117,6 +121,13 @@ def _user_schema(defaults: dict | None = None) -> vol.Schema:
             vol.Required(CONF_MAX_TEMP, default=defaults.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)): vol.All(
                 vol.Coerce(int), vol.Range(min=SUPPORTED_MIN_TEMP, max=SUPPORTED_MAX_TEMP)
             ),
+            vol.Required(CONF_REPEAT_COUNT, default=defaults.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT)): vol.All(
+                vol.Coerce(int), vol.Range(min=1, max=5)
+            ),
+            vol.Required(
+                CONF_REPEAT_DELAY_MS,
+                default=defaults.get(CONF_REPEAT_DELAY_MS, DEFAULT_REPEAT_DELAY_MS),
+            ): vol.All(vol.Coerce(int), vol.Range(min=40, max=500)),
         }
     )
 
@@ -150,6 +161,13 @@ def _options_schema(defaults: dict) -> vol.Schema:
             vol.Required(CONF_MAX_TEMP, default=defaults.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)): vol.All(
                 vol.Coerce(int), vol.Range(min=SUPPORTED_MIN_TEMP, max=SUPPORTED_MAX_TEMP)
             ),
+            vol.Required(CONF_REPEAT_COUNT, default=defaults.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT)): vol.All(
+                vol.Coerce(int), vol.Range(min=1, max=5)
+            ),
+            vol.Required(
+                CONF_REPEAT_DELAY_MS,
+                default=defaults.get(CONF_REPEAT_DELAY_MS, DEFAULT_REPEAT_DELAY_MS),
+            ): vol.All(vol.Coerce(int), vol.Range(min=40, max=500)),
         }
     )
 

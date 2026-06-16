@@ -22,9 +22,12 @@ Protocol summary:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from homeassistant.exceptions import HomeAssistantError
+
+BYTES_PER_PACKET = 14
 
 KNOWN_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     61: (0x0F, 0x80),
@@ -108,6 +111,28 @@ def build_command(
     return MountmanCommand(packet=packet, timings=packet_to_raw_timings(packet))
 
 
+def build_command_from_packet_hex(packet_hex: str) -> MountmanCommand:
+    """Build a command from an exact 14-byte packet written as hex.
+
+    This is a diagnostic path. It bypasses the high-level mode/temp/fan mapper
+    so a captured packet from the research notes can be retransmitted exactly.
+    The checksum is still validated because a typo in one byte can produce a
+    packet that is difficult to reason about during hardware testing.
+    """
+
+    packet = parse_hex_packet(packet_hex)
+    expected_checksum = sum(packet[:-1]) & 0xFF
+    actual_checksum = packet[-1]
+
+    if actual_checksum != expected_checksum:
+        raise HomeAssistantError(
+            "Mountman packet checksum mismatch: "
+            f"expected 0x{expected_checksum:02X}, got 0x{actual_checksum:02X}."
+        )
+
+    return MountmanCommand(packet=packet, timings=packet_to_raw_timings(packet))
+
+
 def build_packet(
     *,
     mode: str,
@@ -186,7 +211,13 @@ def packet_to_raw_timings(packet: list[int]) -> list[int]:
 def parse_hex_packet(packet_hex: str) -> list[int]:
     """Parse a documentation-style hex packet string."""
 
-    return [int(part, 16) for part in packet_hex.split()]
+    parts = re.findall(r"[0-9A-Fa-f]{2}", packet_hex)
+    packet = [int(part, 16) for part in parts]
+    if len(packet) != BYTES_PER_PACKET:
+        raise HomeAssistantError(
+            f"Mountman packets must be {BYTES_PER_PACKET} bytes; parsed {len(packet)} bytes from {packet_hex!r}."
+        )
+    return packet
 
 
 def _cool_family_to_b5(family: str) -> int:
