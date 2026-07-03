@@ -10,6 +10,22 @@ This repository is a public engineering notebook for one captured Mountman remot
 
 The protocol map is early but usable. The captures indicate this is a mini-split/AC-style IR protocol: most useful commands are not simple "button only" commands. They are full-state packets that include mode, temperature, fan/swing-related bits, feature flags, and a checksum.
 
+The Home Assistant Stuff is mostly vibe coded, I worked closely with the AI and I am slowly going through the code. The Protocol capture was all my work. 
+
+## Current Verification Status
+
+The Home Assistant climate entity path has been hardware-tested with a Seeed Studio XIAO IR Mate running the manual ESPHome raw-sender firmware. The verified path is:
+
+```text
+Home Assistant climate entity
+  -> mountman_minisplit HACS integration
+  -> ESPHome Native API raw send action
+  -> XIAO IR Mate IR LEDs
+  -> Mountman mini-split
+```
+
+This confirms the integration can generate and transmit working Mountman full-state packets through ESPHome. Some packet details still need more captures, especially higher inferred temperatures, exact cool-family behavior, swing/fan packing, and special feature buttons.
+
 Treat these findings as evidence for this captured remote/unit family, not as a universal Mountman specification. Mini-splits sold under the same brand can sometimes use different OEM remotes or protocol variants.
 
 ## Quick Start Paths
@@ -67,7 +83,7 @@ This repo includes a small toolchain so the protocol notes are reproducible and 
 
 - `tools/mountman_ir.py` decodes Flipper raw captures, builds Mountman packets, converts packets to raw timings, and writes Flipper `.ir` files.
 - `flipper-tests/MOUNTMAN_FIRST_TESTS.ir` contains the first real-world test bundle: captured heat 72°F, both predicted cool 72°F candidates, and captured power off.
-- `custom_components/mountman_minisplit/` is the HACS-installable Home Assistant custom integration.
+- `custom_components/mountman_minisplit/` is the HACS-installable Home Assistant custom integration. The climate entity path has been verified on the test mini-split.
 - `esphome/xiao-ir-mate-raw-api.yaml` is a manual ESPHome firmware example for exposing a raw IR send action and a fixed OFF test button.
 - `esphome/README.md` explains that firmware files are manual-use only and are not installed by HACS.
 - `home-assistant/SETUP.md` explains the Seeed factory firmware path, HACS install path, and raw transmitter action requirement.

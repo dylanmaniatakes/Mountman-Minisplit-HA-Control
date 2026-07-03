@@ -16,6 +16,18 @@ Home Assistant climate entity
 
 The HACS integration owns the Mountman protocol logic. The transmitter only receives raw timing arrays and transmits them. This keeps protocol fixes versioned through HACS during testing and keeps firmware management separate.
 
+## Verified Test Result
+
+The `mountman_minisplit` HACS climate entity has been verified to control the test Mountman mini-split through a Seeed Studio XIAO IR Mate running the manual ESPHome raw-sender firmware.
+
+This verifies the overall Home Assistant path:
+
+```text
+climate entity -> Mountman packet generator -> ESPHome raw action -> IR LEDs -> mini-split
+```
+
+The integration should still be treated as a protocol-research integration. The basic control path works, but additional captures are needed before every mode, fan/swing combination, special feature, and inferred 73-88F temperature can be considered fully proven.
+
 The integration does not talk to an ESPHome device id directly. It calls a Home Assistant action. That action must be able to accept this data:
 
 ```yaml

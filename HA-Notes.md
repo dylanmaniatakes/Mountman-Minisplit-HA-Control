@@ -2,7 +2,7 @@
 
 These notes describe a practical path to control the Mountman mini-split from Home Assistant using an ESPHome-based infrared proxy / transmitter.
 
-Status: protocol mapping is partially reverse engineered and good enough to begin testing. Full climate control still needs more captures for untested temperatures/features.
+Status: the Home Assistant climate entity path has been hardware-verified through a Seeed Studio XIAO IR Mate running the manual ESPHome raw-sender firmware. Protocol mapping is still partial; more captures are needed for untested temperatures, swing/fan combinations, and special features.
 
 ## Current platform context
 
@@ -27,7 +27,7 @@ For the Seeed Studio XIAO IR Mate path:
 - `home-assistant/SETUP.md` explains how to interpret the factory firmware's Send button entity, such as `button.gym_gym_ir_send`, how to install the HACS integration, and what raw transmitter action the integration expects.
 - The generic ESPHome firmware exposes the dynamic sender as a Native API action, not as a normal device entity. Look for the action in Developer Tools > Actions, usually as `esphome.<node_name>_send_raw`.
 
-The factory firmware Send button is useful for replaying a learned slot. Full Mountman control is better served by the HACS integration plus a user-provided raw-send action because mini-split commands are full-state packets.
+The factory firmware Send button is useful for replaying a learned slot. Full Mountman control is better served by the HACS integration plus a user-provided raw-send action because mini-split commands are full-state packets. This HACS climate path has now been verified on the test mini-split.
 
 ## Recommended hardware
 
@@ -449,6 +449,8 @@ Then expand:
 - Mute, only after the odd mute frame is understood
 
 ## Testing checklist
+
+Baseline result: the HACS climate entity can control the test mini-split through ESPHome raw transmission. Use the remaining checklist items to expand coverage and explain future hardware differences.
 
 1. Place IR transmitter close to the mini-split receiver window.
 2. Load `flipper-tests/MOUNTMAN_FIRST_TESTS.ir` onto the Flipper, or generate equivalent raw timings with `python3 tools/mountman_ir.py`.
