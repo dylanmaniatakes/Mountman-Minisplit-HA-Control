@@ -24,7 +24,7 @@ Home Assistant climate entity
   -> Mountman mini-split
 ```
 
-This confirms the integration can generate and transmit working Mountman full-state packets through ESPHome. Some packet details still need more captures, especially higher inferred temperatures, exact cool-family behavior, swing/fan packing, and special feature buttons.
+This confirms the integration can generate and transmit working Mountman full-state packets through ESPHome. Some packet details still need more captures, especially heat-mode values above 72F, exact cool-family behavior, swing/fan packing, and special feature buttons.
 
 Treat these findings as evidence for this captured remote/unit family, not as a universal Mountman specification. Mini-splits sold under the same brand can sometimes use different OEM remotes or protocol variants.
 
@@ -225,12 +225,14 @@ Additional re-captures using byte 5 = `24` confirm the same temperature fields:
 | `Cool_63_new` | `23 CB 26 01 00 24 03 0E 3D 00 00 00 80 07` |
 | `Cool_64_new` | `23 CB 26 01 00 24 03 0D 3D 00 00 00 80 06` |
 
-Predicted, unconfirmed cool 72°F packets:
+Cool 72°F adjusted candidates:
+
+Live Home Assistant testing showed the first 72F cool guess displayed as 71F on the mini-split. The current cool-mode generator therefore shifts the temperature field up one step at 72F and above.
 
 | Candidate | Packet |
 |---|---|
-| Normal powered family, swing off-ish | `23 CB 26 01 00 24 03 09 05 00 00 00 80 CA` |
-| Alternate cool/display family, high fan/swing on-ish | `23 CB 26 01 00 64 03 09 3D 00 00 00 80 42` |
+| Normal powered family, swing off-ish | `23 CB 26 01 00 24 03 09 05 00 00 00 84 CE` |
+| Alternate cool/display family, high fan/swing on-ish | `23 CB 26 01 00 64 03 09 3D 00 00 00 84 46` |
 
 ### Heat temperature captures
 
@@ -266,7 +268,7 @@ Predicted, unconfirmed cool 72°F packets:
 
 Temperature is split across byte 7 and byte 12. It is not a simple linear single-byte temperature field.
 
-Known values:
+Base field sequence:
 
 | Temp | Byte 7 | Byte 12 |
 |---:|---:|---:|
@@ -287,7 +289,16 @@ Known values:
 | ... | ... | ... |
 | 88°F | `01` | `80` inferred |
 
-A first-pass mapping for captured and inferred values:
+Heat uses this sequence directly. Cool uses this sequence through 71F, then uses the next sequence entry at 72F and above because live testing showed the original 72F guess displayed as 71F on the unit.
+
+```text
+Cool 72F -> base 73F fields: 09 84
+Cool 73F -> base 74F fields: 08 80
+```
+
+For the upper edge, cool 88F continues the same base sequence one more step.
+
+A first-pass mapping for the base sequence:
 
 ```python
 TEMP_MAP_F = {
@@ -434,7 +445,7 @@ def write_flipper_ir(name: str, payload_13: list[int], out_path: str):
 # Example: predicted cool 72°F, normal powered family
 write_flipper_ir(
     "MOUNTMAN_COOL_72_SWINGOFF_HIGH_V2",
-    [0x23, 0xCB, 0x26, 0x01, 0x00, 0x24, 0x03, 0x09, 0x05, 0x00, 0x00, 0x00, 0x80],
+    [0x23, 0xCB, 0x26, 0x01, 0x00, 0x24, 0x03, 0x09, 0x05, 0x00, 0x00, 0x00, 0x84],
     "MOUNTMAN_COOL_72_SWINGOFF_HIGH_V2.ir",
 )
 ```
@@ -463,14 +474,14 @@ capture_new_new_3
 
 ## Known uncertainties / TODO
 
-- Confirm which 72°F cool candidate the unit accepts:
-  - `23 CB 26 01 00 24 03 09 05 00 00 00 80 CA`
-  - `23 CB 26 01 00 64 03 09 3D 00 00 00 80 42`
-- Capture 73-88°F to confirm or correct the inferred temperature map.
+- Confirm which adjusted 72°F cool candidate the unit accepts:
+  - `23 CB 26 01 00 24 03 09 05 00 00 00 84 CE`
+  - `23 CB 26 01 00 64 03 09 3D 00 00 00 84 46`
+- Capture cool 72-88°F and heat 73-88°F to confirm or correct the mode-specific temperature maps.
 - Re-test `Mute_on_new`; it decodes as `23 CB 26 02 00 20 00 00 00 00 00 00 00 45`, but does not match the normal checksum formula. It may be a special frame or a bad capture.
 - Determine exactly how byte 5 `24` vs `64` should be interpreted. Current theory: `24` is normal on-state family and `64` is a display/turbo/sleep/alternate cool family.
 - Determine if byte 8 fully represents fan and swing, or if some swing state is also packed into byte 5 or another feature byte.
-- Confirm whether all modes use the same temperature table.
+- Confirm whether any modes besides cool need their own temperature offset.
 
 ## Project direction
 

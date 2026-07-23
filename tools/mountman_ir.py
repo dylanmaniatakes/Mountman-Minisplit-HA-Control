@@ -67,7 +67,7 @@ BIT_ONE_THRESHOLD_US = 1500
 
 # Temperature is split across byte 7 and byte 12. It is not a simple "temp =
 # byte + offset" field. This table begins with values recovered from captures.
-KNOWN_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+CAPTURED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     61: (0x0F, 0x80),
     62: (0x0F, 0x84),
     63: (0x0E, 0x80),
@@ -82,7 +82,7 @@ KNOWN_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     72: (0x09, 0x80),
 }
 
-INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+HEAT_INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     # The known table shows byte 7 stepping down every two Fahrenheit degrees
     # while byte 12 alternates between 0x80 and 0x84. The 73-88F values below
     # continue that pattern so they can be tested from Home Assistant, but they
@@ -91,9 +91,21 @@ INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     for temp_f in range(73, 89)
 }
 
-TEMP_MAP_F: dict[int, tuple[int, int]] = {
-    **KNOWN_TEMP_MAP_F,
-    **INFERRED_TEMP_MAP_F,
+HEAT_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    **CAPTURED_TEMP_MAP_F,
+    **HEAT_INFERRED_TEMP_MAP_F,
+}
+
+COOL_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    # Cool captures are known through 71F. Live Home Assistant testing showed
+    # that using the heat-style 72F/73F inferred fields made the mini-split show
+    # one degree lower in cool mode. From 72F upward, cool mode therefore uses
+    # the next step in the same observed field sequence.
+    **{temp_f: CAPTURED_TEMP_MAP_F[temp_f] for temp_f in range(61, 72)},
+    **{
+        temp_f: (0x09 - ((temp_f + 1 - 72) // 2), 0x84 if (temp_f + 1) % 2 else 0x80)
+        for temp_f in range(72, 89)
+    },
 }
 
 # Byte 8 appears to pack fan and/or swing/louver state. The names here describe
@@ -116,8 +128,9 @@ CAPTURED_PACKET_HEX: dict[str, str] = {
 }
 
 # This bundle is the recommended first hardware test because it mixes one known
-# working captured command with the two unconfirmed cool-72 candidates. That
-# makes it useful before investing in a full Home Assistant climate entity.
+# working captured command with two cool-72 candidates. The cool-72 temperature
+# field is shifted upward from the original guess because live testing showed
+# the first guess displayed one degree low on the unit.
 FIRST_TEST_PACKETS: tuple[tuple[str, str], ...] = (
     (
         "MOUNTMAN_HEAT_72_CAPTURED",
@@ -125,11 +138,11 @@ FIRST_TEST_PACKETS: tuple[tuple[str, str], ...] = (
     ),
     (
         "MOUNTMAN_COOL_72_NORMAL_B8_05_PREDICTED",
-        "23 CB 26 01 00 24 03 09 05 00 00 00 80 CA",
+        "23 CB 26 01 00 24 03 09 05 00 00 00 84 CE",
     ),
     (
         "MOUNTMAN_COOL_72_ALT_HIGH_PREDICTED",
-        "23 CB 26 01 00 64 03 09 3D 00 00 00 80 42",
+        "23 CB 26 01 00 64 03 09 3D 00 00 00 84 46",
     ),
     (
         "MOUNTMAN_POWER_OFF_CAPTURED",
@@ -380,22 +393,23 @@ def build_mountman_packet(
         # modes.
         return parse_hex_packet(CAPTURED_PACKET_HEX["pow_off"])
 
-    if temp_f not in TEMP_MAP_F:
-        valid = f"{min(TEMP_MAP_F)}-{max(TEMP_MAP_F)}"
+    if temp_f < min(HEAT_TEMP_MAP_F) or temp_f > max(HEAT_TEMP_MAP_F):
+        valid = f"{min(HEAT_TEMP_MAP_F)}-{max(HEAT_TEMP_MAP_F)}"
         raise ValueError(f"temp_f must be in the known/predicted range {valid}, got {temp_f}")
 
-    temp_a, temp_b = TEMP_MAP_F[temp_f]
     b8: int
 
     if mode == "cool":
         if family not in {"normal", "alternate"}:
             raise ValueError("family must be normal or alternate")
+        temp_a, temp_b = _temperature_fields_for_mode(mode, temp_f)
         # Byte 5 is still being learned. Captures show 0x24 for normal/on-state
         # cool commands and 0x64 for the alternate/display/turbo-ish family.
         b5 = 0x24 if family == "normal" else 0x64
         b6 = 0x03
         b8 = _fan_to_b8(fan)
     elif mode == "heat":
+        temp_a, temp_b = _temperature_fields_for_mode(mode, temp_f)
         b5 = 0x24
         b6 = 0x01
         b8 = 0x05
@@ -462,6 +476,19 @@ def _fan_to_b8(fan: str) -> int:
         return B8_FAN[fan]
     except KeyError as exc:
         raise ValueError(f"fan must be one of {', '.join(B8_FAN)}, got {fan!r}") from exc
+
+
+def _temperature_fields_for_mode(mode: str, temp_f: int) -> tuple[int, int]:
+    """Return the mode-specific temperature fields.
+
+    Cool mode uses the next field pair at 72F and above because live testing
+    showed the original inferred table displayed one degree low on the unit.
+    Heat keeps the original table until heat-mode values above 72F can be tested.
+    """
+
+    if mode == "cool":
+        return COOL_TEMP_MAP_F[temp_f]
+    return HEAT_TEMP_MAP_F[temp_f]
 
 
 def _in_range(value: int | float, value_range: tuple[int, int]) -> bool:

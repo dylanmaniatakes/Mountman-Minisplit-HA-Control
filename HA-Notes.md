@@ -2,7 +2,7 @@
 
 These notes describe a practical path to control the Mountman mini-split from Home Assistant using an ESPHome-based infrared proxy / transmitter.
 
-Status: the Home Assistant climate entity path has been hardware-verified through a Seeed Studio XIAO IR Mate running the manual ESPHome raw-sender firmware. Protocol mapping is still partial; more captures are needed for untested temperatures, swing/fan combinations, and special features.
+Status: the Home Assistant climate entity path has been hardware-verified through a Seeed Studio XIAO IR Mate running the manual ESPHome raw-sender firmware. Protocol mapping is still partial; cool-mode live testing showed the 72F-and-up table needs a one-step temperature-field shift, while heat above 72F remains untested.
 
 ## Current platform context
 
@@ -148,6 +148,13 @@ TEMP_MAP_F = {
 }
 ```
 
+Cool-mode live testing note: the original 72F cool guess displayed as 71F on the mini-split, and 73F displayed as 72F. The generator now uses the next temperature-field pair for cool mode at 72F and above:
+
+```text
+Cool 72F -> base 73F fields: 09 84
+Cool 73F -> base 74F fields: 08 80
+```
+
 Known mode/feature fields:
 
 | State | B5 | B6 | B8 |
@@ -193,8 +200,13 @@ TEMP_MAP_F = {
     72: (0x09, 0x80),
     73: (0x09, 0x84), # inferred
     74: (0x08, 0x80), # inferred
-    # Continue the same inferred pattern through 88F.
+    # Heat keeps this inferred pattern through 88F.
 }
+
+# Cool uses TEMP_MAP_F through 71F, then shifts one step higher:
+# cool 72F uses TEMP_MAP_F[73], cool 73F uses TEMP_MAP_F[74], etc.
+# If testing cool 88F, continue the same base sequence one more step so
+# TEMP_MAP_F[89] exists.
 
 B8_FAN = {
     "auto": 0x38,
@@ -239,6 +251,10 @@ def build_mountman_packet(mode="cool", temp_f=72, fan="high", family="normal"):
     temp_a, temp_b = TEMP_MAP_F[temp_f]
 
     if mode == "cool":
+        if temp_f >= 72:
+            # Live testing showed cool-mode values at 72F and above display one
+            # degree low unless they use the next field pair in the sequence.
+            temp_a, temp_b = TEMP_MAP_F[temp_f + 1]
         b5 = 0x24 if family == "normal" else 0x64
         b6 = 0x03
         b8 = B8_FAN[fan]
@@ -281,13 +297,13 @@ Test these before wiring up dashboards or automations.
 ### Cool 72°F, normal family, B8=05
 
 ```text
-23 CB 26 01 00 24 03 09 05 00 00 00 80 CA
+23 CB 26 01 00 24 03 09 05 00 00 00 84 CE
 ```
 
 ### Cool 72°F, alternate family, fan high / swing-on-ish
 
 ```text
-23 CB 26 01 00 64 03 09 3D 00 00 00 80 42
+23 CB 26 01 00 64 03 09 3D 00 00 00 84 46
 ```
 
 ### Heat 72°F, captured real packet
@@ -309,7 +325,7 @@ input_number:
   mountman_target_temp:
     name: Mountman Target Temp
     min: 61
-    max: 88 # 73-88F is inferred and should be confirmed with captures
+    max: 88 # Cool 72F+ is shifted from live testing; heat 73F+ is inferred.
     step: 1
     unit_of_measurement: "°F"
 
@@ -433,7 +449,7 @@ Do not try to support every remote button on day one.
 Start with:
 
 - Off
-- Cool 61-72°F, plus inferred 73-88°F values awaiting capture confirmation
+- Cool 61-71°F capture-backed, plus shifted 72-88°F values from live HA testing
 - Heat 67-72°F
 - Fan auto/low/medium/high in cool mode
 - Swing on/off after confirming B8/family behavior
@@ -441,7 +457,7 @@ Start with:
 
 Then expand:
 
-- 73-88°F, to confirm or correct the inferred temperature map
+- Cool 72-88°F and heat 73-88°F, to confirm or correct the mode-specific temperature maps
 - Sleep
 - Turbo
 - Anti-mildew

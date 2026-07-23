@@ -29,7 +29,7 @@ from homeassistant.exceptions import HomeAssistantError
 
 BYTES_PER_PACKET = 14
 
-KNOWN_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+CAPTURED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     61: (0x0F, 0x80),
     62: (0x0F, 0x84),
     63: (0x0E, 0x80),
@@ -44,7 +44,7 @@ KNOWN_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     72: (0x09, 0x80),
 }
 
-INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+HEAT_INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     # The captured table reaches 72F. Above that, the observed pattern continues
     # cleanly: byte 7 steps down every two Fahrenheit degrees, and byte 12
     # alternates between 0x80 and 0x84. These higher values are intentionally
@@ -53,9 +53,21 @@ INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     for temp_f in range(73, 89)
 }
 
-TEMP_MAP_F: dict[int, tuple[int, int]] = {
-    **KNOWN_TEMP_MAP_F,
-    **INFERRED_TEMP_MAP_F,
+HEAT_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    **CAPTURED_TEMP_MAP_F,
+    **HEAT_INFERRED_TEMP_MAP_F,
+}
+
+COOL_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    # Cool captures are known through 71F. Live Home Assistant testing showed
+    # that using the heat-style 72F/73F inferred fields made the mini-split show
+    # one degree lower in cool mode. From 72F upward, cool mode therefore uses
+    # the next step in the same observed field sequence.
+    **{temp_f: CAPTURED_TEMP_MAP_F[temp_f] for temp_f in range(61, 72)},
+    **{
+        temp_f: (0x09 - ((temp_f + 1 - 72) // 2), 0x84 if (temp_f + 1) % 2 else 0x80)
+        for temp_f in range(72, 89)
+    },
 }
 
 B8_FAN: dict[str, int] = {
@@ -150,20 +162,20 @@ def build_packet(
     if mode == "off":
         return parse_hex_packet(PACKET_HEX_POWER_OFF)
 
-    if temp_f not in TEMP_MAP_F:
-        valid_range = f"{min(TEMP_MAP_F)}-{max(TEMP_MAP_F)}F"
+    if temp_f < min(HEAT_TEMP_MAP_F) or temp_f > max(HEAT_TEMP_MAP_F):
+        valid_range = f"{min(HEAT_TEMP_MAP_F)}-{max(HEAT_TEMP_MAP_F)}F"
         raise HomeAssistantError(
             f"Unsupported Mountman temperature: {temp_f}F. "
-            f"Supported range is {valid_range}; 73-88F is inferred and still needs hardware confirmation."
+            f"Supported range is {valid_range}; some mode-specific values are inferred and still need captures."
         )
 
-    temp_a, temp_b = TEMP_MAP_F[temp_f]
-
     if mode == "cool":
+        temp_a, temp_b = _temperature_fields_for_mode(mode, temp_f)
         b5 = _cool_family_to_b5(family)
         b6 = 0x03
         b8 = _fan_to_b8(fan)
     elif mode == "heat":
+        temp_a, temp_b = _temperature_fields_for_mode(mode, temp_f)
         b5 = 0x24
         b6 = 0x01
         b8 = 0x05
@@ -228,6 +240,20 @@ def _cool_family_to_b5(family: str) -> int:
     if family == "alternate":
         return 0x64
     raise HomeAssistantError(f"Unsupported Mountman packet family: {family}")
+
+
+def _temperature_fields_for_mode(mode: str, temp_f: int) -> tuple[int, int]:
+    """Return the mode-specific temperature fields.
+
+    Cool mode now has its own table because hardware testing showed that the
+    heat/general inferred table is one degree low at 72F and above. Heat keeps
+    the original table because heat-mode values above 72F have not been tested
+    during summer.
+    """
+
+    if mode == "cool":
+        return COOL_TEMP_MAP_F[temp_f]
+    return HEAT_TEMP_MAP_F[temp_f]
 
 
 def _fan_to_b8(fan: str) -> int:

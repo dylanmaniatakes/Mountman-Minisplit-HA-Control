@@ -19,7 +19,7 @@ send_state:
             - "fan_only"
     temp_f:
       name: Temperature
-      description: Fahrenheit setpoint. 61-72F is capture-backed; 73-88F follows the inferred temperature pattern and still needs hardware confirmation.
+      description: Fahrenheit setpoint. Cool 72F and above uses a one-step shifted field map from live HA testing; heat above 72F is still inferred.
       selector:
         number:
           min: 61

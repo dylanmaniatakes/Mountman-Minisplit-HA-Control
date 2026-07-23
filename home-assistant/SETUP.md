@@ -26,7 +26,7 @@ This verifies the overall Home Assistant path:
 climate entity -> Mountman packet generator -> ESPHome raw action -> IR LEDs -> mini-split
 ```
 
-The integration should still be treated as a protocol-research integration. The basic control path works, but additional captures are needed before every mode, fan/swing combination, special feature, and inferred 73-88F temperature can be considered fully proven.
+The integration should still be treated as a protocol-research integration. The basic control path works, and cool-mode live testing showed that 72F and higher need a one-step temperature-field shift. Additional captures are still needed before every mode, fan/swing combination, special feature, and heat value above 72F can be considered fully proven.
 
 The integration does not talk to an ESPHome device id directly. It calls a Home Assistant action. That action must be able to accept this data:
 
@@ -322,6 +322,12 @@ data:
   b8_override: 5
 ```
 
+Expected packet after the cool-mode temperature correction:
+
+```text
+23 CB 26 01 00 24 03 09 05 00 00 00 84 CE
+```
+
 Predicted cool 72F alternate-family high-fan candidate:
 
 ```yaml
@@ -333,6 +339,12 @@ data:
   temp_f: 72
   fan: high
   family: alternate
+```
+
+Expected packet after the cool-mode temperature correction:
+
+```text
+23 CB 26 01 00 64 03 09 3D 00 00 00 84 46
 ```
 
 Power off:

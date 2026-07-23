@@ -32,9 +32,8 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate old config entries when protocol support expands.
 
     Version 1 used 72F as the default maximum because captures only reached 72F.
-    Version 2 keeps the captured values but also allows the inferred 73-88F
-    temperature map. Existing users who accepted the old default should get the
-    expanded test range automatically after updating.
+    Version 2 expanded the test range. Existing users who accepted the old
+    default should get the expanded range automatically after updating.
     """
 
     if entry.version != 1:
