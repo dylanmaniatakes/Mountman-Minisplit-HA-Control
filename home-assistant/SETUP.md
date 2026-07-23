@@ -26,7 +26,7 @@ This verifies the overall Home Assistant path:
 climate entity -> Mountman packet generator -> ESPHome raw action -> IR LEDs -> mini-split
 ```
 
-The integration should still be treated as a protocol-research integration. The basic control path works, and cool-mode live testing showed that 72F and higher need a one-step temperature-field shift. Additional captures are still needed before every mode, fan/swing combination, special feature, and heat value above 72F can be considered fully proven.
+The integration should still be treated as a protocol-research integration. The basic control path works. Live testing found that cool needs a one-step temperature-field shift from 72F onward, and heat needs the same correction from 73F onward. Additional raw captures are still needed before every mode, fan/swing combination, and special feature can be considered fully proven.
 
 The integration does not talk to an ESPHome device id directly. It calls a Home Assistant action. That action must be able to accept this data:
 

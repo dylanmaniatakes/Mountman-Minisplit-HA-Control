@@ -40,15 +40,15 @@ class MountmanIrTests(unittest.TestCase):
         self.assertEqual(ir.packet_to_hex(cool_72_normal_b8_05), "23 CB 26 01 00 24 03 09 05 00 00 00 84 CE")
         self.assertEqual(ir.packet_to_hex(cool_72_alt_high), "23 CB 26 01 00 64 03 09 3D 00 00 00 84 46")
 
-    def test_generate_inferred_temperature_packets(self) -> None:
-        """Inferred temperatures should follow the documented mode-specific pattern."""
+    def test_generate_shifted_temperature_packets(self) -> None:
+        """Tested high setpoints should follow each mode's documented field shift."""
 
         heat_73 = ir.build_mountman_packet(mode="heat", temp_f=73)
         heat_88 = ir.build_mountman_packet(mode="heat", temp_f=88)
         cool_73 = ir.build_mountman_packet(mode="cool", temp_f=73, b8_override=0x05)
 
-        self.assertEqual(ir.packet_to_hex(heat_73), "23 CB 26 01 00 24 01 09 05 00 00 00 84 CC")
-        self.assertEqual(ir.packet_to_hex(heat_88), "23 CB 26 01 00 24 01 01 05 00 00 00 80 C0")
+        self.assertEqual(ir.packet_to_hex(heat_73), "23 CB 26 01 00 24 01 08 05 00 00 00 80 C7")
+        self.assertEqual(ir.packet_to_hex(heat_88), "23 CB 26 01 00 24 01 01 05 00 00 00 84 C4")
         self.assertEqual(ir.packet_to_hex(cool_73), "23 CB 26 01 00 24 03 08 05 00 00 00 80 C9")
 
     def test_esphome_raw_timings_use_negative_spaces(self) -> None:

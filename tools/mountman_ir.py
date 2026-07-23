@@ -82,18 +82,19 @@ CAPTURED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     72: (0x09, 0x80),
 }
 
-HEAT_INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
-    # The known table shows byte 7 stepping down every two Fahrenheit degrees
-    # while byte 12 alternates between 0x80 and 0x84. The 73-88F values below
-    # continue that pattern so they can be tested from Home Assistant, but they
-    # should be treated as predicted until captures confirm them.
-    temp_f: (0x09 - ((temp_f - 72) // 2), 0x84 if temp_f % 2 else 0x80)
+HEAT_SHIFTED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    # Heat 72F is capture-backed. Live Home Assistant testing showed that heat
+    # begins displaying one degree low at 73F: HA 73F selected 72F on the unit,
+    # and HA 74F selected 73F. Use the next field pair for each heat setpoint
+    # from 73F onward. The formula continues the observed two-field sequence
+    # through the tool's 88F limit; raw captures are still welcome.
+    temp_f: (0x09 - ((temp_f + 1 - 72) // 2), 0x84 if (temp_f + 1) % 2 else 0x80)
     for temp_f in range(73, 89)
 }
 
 HEAT_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     **CAPTURED_TEMP_MAP_F,
-    **HEAT_INFERRED_TEMP_MAP_F,
+    **HEAT_SHIFTED_TEMP_MAP_F,
 }
 
 COOL_TEMP_MAP_F: dict[int, tuple[int, int]] = {
@@ -481,9 +482,10 @@ def _fan_to_b8(fan: str) -> int:
 def _temperature_fields_for_mode(mode: str, temp_f: int) -> tuple[int, int]:
     """Return the mode-specific temperature fields.
 
-    Cool mode uses the next field pair at 72F and above because live testing
-    showed the original inferred table displayed one degree low on the unit.
-    Heat keeps the original table until heat-mode values above 72F can be tested.
+    Cool and heat use their own shifted ranges because live Home Assistant
+    testing found different transition points. Cool needs the next field pair
+    from 72F onward; heat needs it from 73F onward. The distinct tables retain
+    capture-backed values below those boundaries.
     """
 
     if mode == "cool":

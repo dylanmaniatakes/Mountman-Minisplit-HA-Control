@@ -24,7 +24,7 @@ Home Assistant climate entity
   -> Mountman mini-split
 ```
 
-This confirms the integration can generate and transmit working Mountman full-state packets through ESPHome. Some packet details still need more captures, especially heat-mode values above 72F, exact cool-family behavior, swing/fan packing, and special feature buttons.
+This confirms the integration can generate and transmit working Mountman full-state packets through ESPHome. Live testing also confirmed the temperature-field correction boundaries: cool shifts one field pair from 72F onward, and heat shifts one field pair from 73F onward. Some packet details still need raw captures, especially exact cool-family behavior, swing/fan packing, and special feature buttons.
 
 Treat these findings as evidence for this captured remote/unit family, not as a universal Mountman specification. Mini-splits sold under the same brand can sometimes use different OEM remotes or protocol variants.
 
@@ -284,19 +284,23 @@ Base field sequence:
 | 70°F | `0A` | `80` |
 | 71°F | `0A` | `84` |
 | 72°F | `09` | `80` |
-| 73°F | `09` | `84` inferred |
-| 74°F | `08` | `80` inferred |
+| 73°F | `09` | `84` reconstructed base sequence |
+| 74°F | `08` | `80` reconstructed base sequence |
 | ... | ... | ... |
-| 88°F | `01` | `80` inferred |
+| 88°F | `01` | `80` reconstructed base sequence |
 
-Heat uses this sequence directly. Cool uses this sequence through 71F, then uses the next sequence entry at 72F and above because live testing showed the original 72F guess displayed as 71F on the unit.
+The base sequence describes the ordered field pairs, not the final per-mode setpoint mapping. Both modes use it directly through 71F. Cool uses the next sequence entry from 72F onward because HA 72F originally displayed as 71F on the unit. Heat retains the captured 72F mapping, then uses the next sequence entry from 73F onward because HA 73F displayed as 72F and HA 74F displayed as 73F.
 
 ```text
 Cool 72F -> base 73F fields: 09 84
 Cool 73F -> base 74F fields: 08 80
+
+Heat 72F -> base 72F fields: 09 80
+Heat 73F -> base 74F fields: 08 80
+Heat 74F -> base 75F fields: 08 84
 ```
 
-For the upper edge, cool 88F continues the same base sequence one more step.
+For the upper edge, cool 88F and heat 88F each continue the same base sequence one more step.
 
 A first-pass mapping for the base sequence:
 
@@ -477,11 +481,11 @@ capture_new_new_3
 - Confirm which adjusted 72°F cool candidate the unit accepts:
   - `23 CB 26 01 00 24 03 09 05 00 00 00 84 CE`
   - `23 CB 26 01 00 64 03 09 3D 00 00 00 84 46`
-- Capture cool 72-88°F and heat 73-88°F to confirm or correct the mode-specific temperature maps.
+- Record raw captures for cool 72-88°F and heat 73-88°F to confirm the working mode-specific maps and document the protocol independently of live behavior.
 - Re-test `Mute_on_new`; it decodes as `23 CB 26 02 00 20 00 00 00 00 00 00 00 45`, but does not match the normal checksum formula. It may be a special frame or a bad capture.
 - Determine exactly how byte 5 `24` vs `64` should be interpreted. Current theory: `24` is normal on-state family and `64` is a display/turbo/sleep/alternate cool family.
 - Determine if byte 8 fully represents fan and swing, or if some swing state is also packed into byte 5 or another feature byte.
-- Confirm whether any modes besides cool need their own temperature offset.
+- Confirm whether dry, fan-only, or other modes need their own temperature-field behavior.
 
 ## Project direction
 

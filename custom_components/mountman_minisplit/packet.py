@@ -44,18 +44,19 @@ CAPTURED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     72: (0x09, 0x80),
 }
 
-HEAT_INFERRED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
-    # The captured table reaches 72F. Above that, the observed pattern continues
-    # cleanly: byte 7 steps down every two Fahrenheit degrees, and byte 12
-    # alternates between 0x80 and 0x84. These higher values are intentionally
-    # marked as inferred in the docs until hardware captures confirm them.
-    temp_f: (0x09 - ((temp_f - 72) // 2), 0x84 if temp_f % 2 else 0x80)
+HEAT_SHIFTED_TEMP_MAP_F: dict[int, tuple[int, int]] = {
+    # Heat 72F is capture-backed. Live Home Assistant testing showed that heat
+    # begins displaying one degree low at 73F: HA 73F selected 72F on the unit,
+    # and HA 74F selected 73F. Use the next field pair for each heat setpoint
+    # from 73F onward. The formula continues the observed two-field sequence
+    # through the integration's 88F limit; raw captures are still welcome.
+    temp_f: (0x09 - ((temp_f + 1 - 72) // 2), 0x84 if (temp_f + 1) % 2 else 0x80)
     for temp_f in range(73, 89)
 }
 
 HEAT_TEMP_MAP_F: dict[int, tuple[int, int]] = {
     **CAPTURED_TEMP_MAP_F,
-    **HEAT_INFERRED_TEMP_MAP_F,
+    **HEAT_SHIFTED_TEMP_MAP_F,
 }
 
 COOL_TEMP_MAP_F: dict[int, tuple[int, int]] = {
@@ -245,10 +246,10 @@ def _cool_family_to_b5(family: str) -> int:
 def _temperature_fields_for_mode(mode: str, temp_f: int) -> tuple[int, int]:
     """Return the mode-specific temperature fields.
 
-    Cool mode now has its own table because hardware testing showed that the
-    heat/general inferred table is one degree low at 72F and above. Heat keeps
-    the original table because heat-mode values above 72F have not been tested
-    during summer.
+    Cool and heat use their own shifted ranges because live Home Assistant
+    testing found different transition points. Cool needs the next field pair
+    from 72F onward; heat needs it from 73F onward. The distinct tables retain
+    capture-backed values below those boundaries.
     """
 
     if mode == "cool":

@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Mountman Mini-Split IR",
-        "description": "Create an assumed-state climate entity that sends Mountman IR packets through a raw IR transmitter action. Enter an action such as esphome.gym_send_raw or esphome.gymircontroller_send_raw. Do not enter a device id, device name, or button.gym_gym_ir_send entity id. The action must accept ESPHome signed timings where spaces are negative. Cool 72F and above uses a live-tested one-step temperature-field shift; heat above 72F is still inferred.",
+        "description": "Create an assumed-state climate entity that sends Mountman IR packets through a raw IR transmitter action. Enter an action such as esphome.gym_send_raw or esphome.gymircontroller_send_raw. Do not enter a device id, device name, or button.gym_gym_ir_send entity id. The action must accept ESPHome signed timings where spaces are negative. Live testing found a one-step temperature-field shift from cool 72F and heat 73F onward.",
         "data": {
           "name": "Name",
           "transmitter_action": "Raw IR transmitter action",
@@ -25,7 +25,7 @@
     "step": {
       "init": {
         "title": "Mountman Mini-Split IR options",
-        "description": "Update the raw IR transmitter action and protocol defaults without removing the climate entity. Enter an action such as esphome.gym_send_raw or esphome.gymircontroller_send_raw. Do not enter a device id, device name, or button.gym_gym_ir_send entity id. The action must accept ESPHome signed timings where spaces are negative. Cool 72F and above uses a live-tested one-step temperature-field shift; heat above 72F is still inferred.",
+        "description": "Update the raw IR transmitter action and protocol defaults without removing the climate entity. Enter an action such as esphome.gym_send_raw or esphome.gymircontroller_send_raw. Do not enter a device id, device name, or button.gym_gym_ir_send entity id. The action must accept ESPHome signed timings where spaces are negative. Live testing found a one-step temperature-field shift from cool 72F and heat 73F onward.",
         "data": {
           "transmitter_action": "Raw IR transmitter action",
           "packet_family": "Default cool packet family",

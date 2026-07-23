@@ -2,7 +2,7 @@
 
 These notes describe a practical path to control the Mountman mini-split from Home Assistant using an ESPHome-based infrared proxy / transmitter.
 
-Status: the Home Assistant climate entity path has been hardware-verified through a Seeed Studio XIAO IR Mate running the manual ESPHome raw-sender firmware. Protocol mapping is still partial; cool-mode live testing showed the 72F-and-up table needs a one-step temperature-field shift, while heat above 72F remains untested.
+Status: the Home Assistant climate entity path has been hardware-verified through a Seeed Studio XIAO IR Mate running the manual ESPHome raw-sender firmware. Protocol mapping is still partial; live testing showed cool needs a one-step temperature-field shift from 72F onward, while heat needs the same shift from 73F onward.
 
 ## Current platform context
 
@@ -148,11 +148,15 @@ TEMP_MAP_F = {
 }
 ```
 
-Cool-mode live testing note: the original 72F cool guess displayed as 71F on the mini-split, and 73F displayed as 72F. The generator now uses the next temperature-field pair for cool mode at 72F and above:
+Live temperature-mapping notes: the original 72F cool guess displayed as 71F on the mini-split, and 73F displayed as 72F. Cool therefore uses the next temperature-field pair at 72F and above. Heat 72F remains capture-backed; live testing showed HA 73F selected 72F and HA 74F selected 73F, so heat uses the next pair at 73F and above.
 
 ```text
 Cool 72F -> base 73F fields: 09 84
 Cool 73F -> base 74F fields: 08 80
+
+Heat 72F -> base 72F fields: 09 80
+Heat 73F -> base 74F fields: 08 80
+Heat 74F -> base 75F fields: 08 84
 ```
 
 Known mode/feature fields:
@@ -200,13 +204,14 @@ TEMP_MAP_F = {
     72: (0x09, 0x80),
     73: (0x09, 0x84), # inferred
     74: (0x08, 0x80), # inferred
-    # Heat keeps this inferred pattern through 88F.
+    # The base sequence continues through 88F. It is shifted per mode below.
 }
 
 # Cool uses TEMP_MAP_F through 71F, then shifts one step higher:
 # cool 72F uses TEMP_MAP_F[73], cool 73F uses TEMP_MAP_F[74], etc.
-# If testing cool 88F, continue the same base sequence one more step so
-# TEMP_MAP_F[89] exists.
+# Heat uses TEMP_MAP_F through 72F, then shifts one step higher:
+# heat 73F uses TEMP_MAP_F[74], heat 74F uses TEMP_MAP_F[75], etc.
+# Continue the base sequence one more step so the 88F shifted values exist.
 
 B8_FAN = {
     "auto": 0x38,
@@ -252,13 +257,17 @@ def build_mountman_packet(mode="cool", temp_f=72, fan="high", family="normal"):
 
     if mode == "cool":
         if temp_f >= 72:
-            # Live testing showed cool-mode values at 72F and above display one
-            # degree low unless they use the next field pair in the sequence.
+            # Cool 72F and above display one degree low unless they use the
+            # next field pair in the reconstructed base sequence.
             temp_a, temp_b = TEMP_MAP_F[temp_f + 1]
         b5 = 0x24 if family == "normal" else 0x64
         b6 = 0x03
         b8 = B8_FAN[fan]
     elif mode == "heat":
+        if temp_f >= 73:
+            # Heat follows the same correction one degree later: HA 73F
+            # selected 72F on the unit, and HA 74F selected 73F.
+            temp_a, temp_b = TEMP_MAP_F[temp_f + 1]
         b5 = 0x24
         b6 = 0x01
         b8 = 0x05
@@ -325,7 +334,7 @@ input_number:
   mountman_target_temp:
     name: Mountman Target Temp
     min: 61
-    max: 88 # Cool 72F+ is shifted from live testing; heat 73F+ is inferred.
+    max: 88 # Cool shifts from 72F; heat shifts from 73F, both from live testing.
     step: 1
     unit_of_measurement: "°F"
 
@@ -449,15 +458,15 @@ Do not try to support every remote button on day one.
 Start with:
 
 - Off
-- Cool 61-71°F capture-backed, plus shifted 72-88°F values from live HA testing
-- Heat 67-72°F
+- Cool 61-71°F capture-backed, plus live-tested shifted 72-88°F values
+- Heat 67-72°F capture-backed, plus live-tested shifted 73-88°F values
 - Fan auto/low/medium/high in cool mode
 - Swing on/off after confirming B8/family behavior
 - Eco on/off after confirming exact fields
 
 Then expand:
 
-- Cool 72-88°F and heat 73-88°F, to confirm or correct the mode-specific temperature maps
+- Raw captures for cool 72-88°F and heat 73-88°F, to independently document the working mode-specific temperature maps
 - Sleep
 - Turbo
 - Anti-mildew
